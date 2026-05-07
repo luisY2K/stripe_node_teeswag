@@ -7,6 +7,7 @@
     "node": ">=24"
   },
   "scripts": {
+    "setup:awesome": "tsx --env-file=.env src/scripts/setupAwesome.ts",
     "dev": "tsx --env-file=.env src/scripts/example.ts",
     "script": "tsx --env-file=.env",
     "typecheck": "tsc --noEmit",
