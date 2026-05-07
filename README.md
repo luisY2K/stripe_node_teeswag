@@ -16,7 +16,8 @@ npm install
 | Command | Description |
 | --- | --- |
 | `npm run setup:awesome` | Idempotent: Awesome product, 20 EUR/mo price, coupons |
-| `npm run setup:subscription` | New faker customer + subscription schedule (90% → 50% → release) |
+| `npm run setup:subscription` | New faker customer + schedule (90% → 50% → release) |
+| `npm run setup:subscription:trial` | Same + trial first (1mo trial → 2mo 90% → 3mo 50% → release) |
 | `npm run dev` | Run `src/scripts/example.ts` with `.env` |
 | `npm run script -- src/scripts/foo.ts` | Run any script with `.env` |
 | `npm run typecheck` | TypeScript check |

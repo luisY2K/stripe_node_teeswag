@@ -20,7 +20,8 @@ async function main(): Promise<void> {
   });
 
   const schedule = await createAwesomeSchedule(customer.id, [
-    { kind: "discount", couponId: COUPON_90, durationMonths: 3 },
+    { kind: "trial", durationMonths: 1 },
+    { kind: "discount", couponId: COUPON_90, durationMonths: 2 },
     { kind: "discount", couponId: COUPON_50, durationMonths: 3 },
   ]);
 
@@ -35,7 +36,7 @@ async function main(): Promise<void> {
   console.log(`Schedule:     ${schedule.id}`);
   console.log(`Subscription: ${subId}`);
   console.log(
-    "Tip: attach a test clock in the dashboard to advance billing and verify phases.",
+    "Phases: 1mo trial -> 2mo 90% -> 3mo 50% -> release. Use a test clock in the dashboard to advance.",
   );
 }
 
