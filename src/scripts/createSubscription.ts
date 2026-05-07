@@ -1,3 +1,4 @@
+import { dashboardSubscriptionUrl } from "../lib/dashboardUrl.js";
 import { createAwesomeSchedule } from "../lib/awesomeSchedule.js";
 import { makeFakeCustomer } from "../lib/fakeCustomer.js";
 import { parseMonthArg } from "../lib/parseMonthArg.js";
@@ -65,6 +66,9 @@ async function main(): Promise<void> {
   console.log(`Customer:      ${customer.id} (${name}, ${email})`);
   console.log(`Schedule:      ${schedule.id}`);
   console.log(`Subscription:  ${subId}`);
+  if (subId !== "(pending)") {
+    console.log(`Dashboard:     ${dashboardSubscriptionUrl(subId)}`);
+  }
   console.log(`Advanced:      ${months} month(s) (~${months * 30}d on clock)`);
   console.log(
     "Tip: npm run apply:retention -- <subscription_id> to swap current phase coupon.",

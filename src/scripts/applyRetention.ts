@@ -1,4 +1,5 @@
 import { applyAwesomeRetention } from "../lib/applyRetention.js";
+import { dashboardSubscriptionUrl } from "../lib/dashboardUrl.js";
 
 async function main(): Promise<void> {
   const subscriptionId = process.argv[2];
@@ -12,6 +13,7 @@ async function main(): Promise<void> {
     await applyAwesomeRetention(subscriptionId);
   console.log(`Schedule:        ${scheduleId}`);
   console.log(`Applied coupon:  ${appliedCouponId}`);
+  console.log(`Dashboard:       ${dashboardSubscriptionUrl(subscriptionId)}`);
 }
 
 main().catch((err: unknown) => {
