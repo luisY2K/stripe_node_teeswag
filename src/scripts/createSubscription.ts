@@ -1,5 +1,6 @@
 import { dashboardSubscriptionUrl } from "../lib/dashboardUrl.js";
 import { createAwesomeSchedule } from "../lib/awesomeSchedule.js";
+import { ensureAwesomeCatalog } from "../lib/ensureAwesomeCatalog.js";
 import { makeFakeCustomer } from "../lib/fakeCustomer.js";
 import { parseMonthArg } from "../lib/parseMonthArg.js";
 import {
@@ -15,6 +16,7 @@ const TEST_PM = "pm_card_visa";
 const DAY = 86_400;
 
 async function main(): Promise<void> {
+  await ensureAwesomeCatalog();
   const months = parseMonthArg(process.argv.slice(2));
   const { name, email } = makeFakeCustomer();
 

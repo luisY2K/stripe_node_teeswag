@@ -4,6 +4,8 @@
 
 This document connects the partner scenario in [Partner Presentation Case.pdf](Partner%20Presentation%20Case.pdf) to what **this codebase actually prototypes** today. It separates **business intent** from **implemented scripts** so stakeholders know what is demonstrated in Stripe test mode versus what remains presentation or future product work.
 
+For multi-product / multi-subscription edge cases (delivery + streaming alignment, bundle vs split subs), see [subscription-cases.md](subscription-cases.md).
+
 ## Business context (partner brief)
 
 After launching subscriptions, TeeSwag explores a **video streaming** offering to bundle with promotions for their core apparel business. The brief describes:

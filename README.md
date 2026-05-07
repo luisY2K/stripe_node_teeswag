@@ -6,7 +6,7 @@ Use cases mapped to the partner brief and this repo: [docs/use-cases.md](docs/us
 
 The scaffold ships an end-to-end flow:
 
-1. **Setup** the "Awesome" product, monthly EUR price, discount/retention coupons, and optional **PPV** catalog (separate product, Billing meter, metered price) (idempotent).
+1. **Setup** the "Awesome" product, monthly EUR price, discount/retention coupons, and **PPV** catalog (separate product, Billing meter, metered price) via `npm run setup:awesome` (idempotent). The subscription scripts also **auto-provision** the same catalog on startup if needed.
 2. **Create** a subscription via a phased schedule (with optional trial), under a fresh test clock and faker-generated customer.
 3. **Advance** the clock by N months to simulate billing cycles.
 4. **Apply retention** to swap the current phase coupon to a richer offer.
@@ -30,21 +30,21 @@ STRIPE_SECRET_KEY=sk_test_...
 
 ## Scripts
 
-| Command                                   | Description                                                                                                                                        |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run setup:awesome`                   | Idempotent: Awesome product, 20 EUR/mo price, discount coupons, PPV product + meter + **2.99 EUR/view** metered price                              |
-| `npm run create:subscription`             | Test clock + faker customer + schedule (90% → 50% → release). Optional `month N` / `m N` advances the clock by ~N×30d (chunked, 2 months/step)     |
-| `npm run create:subscription:trial`       | Same as above but starts with a 1-month trial (trial → 90% → 50% → release)                                                                        |
-| `npm run create:subscription:ppv`         | Base subscription + metered pay-per-view item (no coupons). Optional `views K` / `v K` records meter events; optional `month N` advances the clock |
-| `npm run apply:retention -- sub_...`      | Swap the current schedule phase coupon (90%→100%, 50%→70%) on the active subscription                                                              |
-| `npm run dev`                             | Run `src/scripts/example.ts` with `.env` loaded                                                                                                    |
-| `npm run script -- src/scripts/foo.ts`    | Run any script with `.env` loaded                                                                                                                  |
-| `npm run typecheck`                       | TypeScript check (`tsc --noEmit`)                                                                                                                  |
-| `npm run lint` / `npm run lint:fix`       | ESLint                                                                                                                                             |
-| `npm run format` / `npm run format:check` | Prettier                                                                                                                                           |
-| `npm test`                                | Unit tests only                                                                                                                                    |
-| `npm run test:integration`                | Stripe integration tests (requires `.env`)                                                                                                         |
-| `npm run test:watch`                      | Vitest watch                                                                                                                                       |
+| Command                                   | Description                                                                                                                                                    |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run setup:awesome`                   | Idempotent: Awesome product, 20 EUR/mo price, discount coupons, PPV product + meter + **2.99 EUR/view** metered price                                          |
+| `npm run create:subscription`             | Ensures catalog, then test clock + customer + schedule (90% → 50% → release). Optional `month N` / `m N` advances the clock by ~N×30d (chunked, 2 months/step) |
+| `npm run create:subscription:trial`       | Same as `create:subscription` but starts with a 1-month trial (trial → 90% → 50% → release)                                                                    |
+| `npm run create:subscription:ppv`         | Ensures catalog, then base subscription + metered PPV. Optional `views K` / `v K` and `month N`                                                                |
+| `npm run apply:retention -- sub_...`      | Ensures catalog, then swaps the current schedule phase coupon (90%→100%, 50%→70%) on the active subscription                                                   |
+| `npm run dev`                             | Run `src/scripts/example.ts` with `.env` loaded                                                                                                                |
+| `npm run script -- src/scripts/foo.ts`    | Run any script with `.env` loaded                                                                                                                              |
+| `npm run typecheck`                       | TypeScript check (`tsc --noEmit`)                                                                                                                              |
+| `npm run lint` / `npm run lint:fix`       | ESLint                                                                                                                                                         |
+| `npm run format` / `npm run format:check` | Prettier                                                                                                                                                       |
+| `npm test`                                | Unit tests only                                                                                                                                                |
+| `npm run test:integration`                | Stripe integration tests (requires `.env`)                                                                                                                     |
+| `npm run test:watch`                      | Vitest watch                                                                                                                                                   |
 
 ### Examples
 
@@ -81,6 +81,7 @@ src/
     stripe.ts               # Stripe client (uses STRIPE_SECRET_KEY)
     stripeApiVersion.ts     # Pinned API version
     stripeIdempotent.ts     # Idempotent product/price/coupon/meter helpers
+    ensureAwesomeCatalog.ts # Full catalog provisioning (shared with setup + scripts)
     ppvConstants.ts         # PPV meter event name + metered price lookup key
     recordPpvViews.ts       # Billing Meter Events for pay-per-view
     createBaseWithPpvSubscription.ts  # Base + metered PPV on one subscription
@@ -114,4 +115,5 @@ Integration tests under `tests/integration/` create a test clock, attach a custo
 
 - **Test mode keys only.** Never commit `.env`.
 - The `pm_card_visa` test PaymentMethod is attached to created customers; the **attached PM id** (not the alias) is set as the customer's default for invoices.
-- Retention coupons (`awesome-100-off-3m`, `awesome-70-off-3m`) use the same **`findOrCreateCoupon`** helpers as [`npm run setup:awesome`](src/scripts/setupAwesome.ts); `apply:retention` may create them if you skipped setup (idempotent).
+- **`create:subscription`**, **`create:subscription:trial`**, **`create:subscription:ppv`**, and **`apply:retention`** call [`ensureAwesomeCatalog`](src/lib/ensureAwesomeCatalog.ts) first—the same idempotent objects as [`npm run setup:awesome`](src/scripts/setupAwesome.ts). Running setup separately is optional but useful to inspect created IDs.
+- Retention coupons (`awesome-100-off-3m`, `awesome-70-off-3m`) use the same **`findOrCreateCoupon`** helpers as setup; [`applyRetention`](src/lib/applyRetention.ts) also ensures them when needed (idempotent).
