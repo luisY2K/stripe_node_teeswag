@@ -1,35 +1,107 @@
 # teeswag-alt
 
-Node v24 + TypeScript scripts with Stripe (test clocks), ESLint, Prettier, and Vitest.
+Node v24 + TypeScript scripts for prototyping Stripe subscription flows with **test clocks**, ESLint, Prettier, and Vitest.
+
+The scaffold ships an end-to-end flow:
+
+1. **Setup** the "Awesome" product, monthly EUR price, and discount/retention coupons (idempotent).
+2. **Create** a subscription via a phased schedule (with optional trial), under a fresh test clock and faker-generated customer.
+3. **Advance** the clock by N months to simulate billing cycles.
+4. **Apply retention** to swap the current phase coupon to a richer offer.
+5. Every subscription-touching script prints a **Stripe Dashboard URL** for quick navigation.
 
 ## Setup
 
 ```bash
-nvm use   # or ensure Node >= 24
-cp .env.example .env
-# Add STRIPE_SECRET_KEY=sk_test_...
+nvm use                # or ensure Node >= 24
+cp .env.example .env   # then add STRIPE_SECRET_KEY=sk_test_...
 npm install
 ```
+
+`.env` must contain a **test mode** secret key:
+
+```env
+STRIPE_SECRET_KEY=sk_test_...
+```
+
+> The Dashboard URL helper inspects `STRIPE_SECRET_KEY` at print time. Keys starting with `sk_test_` produce `https://dashboard.stripe.com/test/...`; anything else produces live URLs. Default is test mode if the env is missing.
 
 ## Scripts
 
 | Command | Description |
 | --- | --- |
-| `npm run setup:awesome` | Idempotent: Awesome product, 20 EUR/mo price, coupons |
-| `npm run create:subscription` | Test clock + faker customer + schedule (90% → 50% → release); `month N` / `m N` advances clock ~N×30d |
-| `npm run create:subscription:trial` | Same with trial first; `month` / `m` as above |
-| `npm run apply:retention -- sub_...` | Swap current phase coupon (90%→100%, 50%→70%) on active schedule |
-| `npm run dev` | Run `src/scripts/example.ts` with `.env` |
-| `npm run script -- src/scripts/foo.ts` | Run any script with `.env` |
-| `npm run typecheck` | TypeScript check |
+| `npm run setup:awesome` | Idempotent: Awesome product, 20 EUR/mo price, and discount coupons |
+| `npm run create:subscription` | Test clock + faker customer + schedule (90% → 50% → release). Optional `month N` / `m N` advances the clock by ~N×30d (chunked, 2 months/step) |
+| `npm run create:subscription:trial` | Same as above but starts with a 1-month trial (trial → 90% → 50% → release) |
+| `npm run apply:retention -- sub_...` | Swap the current schedule phase coupon (90%→100%, 50%→70%) on the active subscription |
+| `npm run dev` | Run `src/scripts/example.ts` with `.env` loaded |
+| `npm run script -- src/scripts/foo.ts` | Run any script with `.env` loaded |
+| `npm run typecheck` | TypeScript check (`tsc --noEmit`) |
 | `npm run lint` / `npm run lint:fix` | ESLint |
 | `npm run format` / `npm run format:check` | Prettier |
 | `npm test` | Unit tests only |
 | `npm run test:integration` | Stripe integration tests (requires `.env`) |
 | `npm run test:watch` | Vitest watch |
 
+### Examples
+
+```bash
+npm run setup:awesome
+
+npm run create:subscription           # no advance
+npm run create:subscription month 4   # advance ~4 months
+npm run create:subscription m 6       # short alias
+
+npm run create:subscription:trial m 2
+
+npm run apply:retention -- sub_1ABC...
+```
+
+Each subscription script prints the dashboard link, e.g.:
+
+```
+Test clock:    clock_1...
+Customer:      cus_1... (Jane Doe, jane@example.com)
+Schedule:      sub_sched_1...
+Subscription:  sub_1...
+Dashboard:     https://dashboard.stripe.com/test/subscriptions/sub_1...
+Advanced:      4 month(s) (~120d on clock)
+```
+
+## Project layout
+
+```
+src/
+  lib/
+    stripe.ts               # Stripe client (uses STRIPE_SECRET_KEY)
+    stripeApiVersion.ts     # Pinned API version
+    stripeIdempotent.ts     # Idempotent product/price/coupon helpers
+    awesomeSchedule.ts      # Build phased subscription schedules
+    applyRetention.ts       # Swap current phase coupon for retention coupon
+    testClock.ts            # createTestClock / advanceTestClock / waitTestClockReady
+    fakeCustomer.ts         # Faker-generated customer details
+    parseMonthArg.ts        # Parses `month N` / `m N` CLI args
+    dashboardUrl.ts         # dashboardSubscriptionUrl(id)
+    getPriceByLookupKey.ts
+    env.ts
+  scripts/
+    setupAwesome.ts
+    createSubscription.ts
+    createSubscriptionWithTrial.ts
+    applyRetention.ts
+    example.ts              # `npm run dev` entry
+tests/
+  integration/              # Stripe-backed tests (test clocks)
+```
+
 ## Stripe test clocks
 
-Helpers live in [`src/lib/testClock.ts`](src/lib/testClock.ts). Integration tests under `tests/integration/` create a test clock, attach a customer, optionally advance time, then clean up.
+Helpers live in [`src/lib/testClock.ts`](src/lib/testClock.ts). Stripe rejects single advances that span more than two billing intervals while monthly subscriptions exist, so the create scripts advance in **2-month chunks**, awaiting `frozen_time` readiness between steps via `waitTestClockReady`.
 
-Use **test mode** keys only. Never commit `.env`.
+Integration tests under `tests/integration/` create a test clock, attach a customer, optionally advance time, then clean up.
+
+## Notes
+
+- **Test mode keys only.** Never commit `.env`.
+- The `pm_card_visa` test PaymentMethod is attached to created customers; the **attached PM id** (not the alias) is set as the customer's default for invoices.
+- Retention coupons (`awesome-100-off-3m`, `awesome-70-off-3m`) are auto-created on demand if missing.
