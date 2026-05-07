@@ -8,6 +8,7 @@
   },
   "scripts": {
     "setup:awesome": "tsx --env-file=.env src/scripts/setupAwesome.ts",
+    "setup:subscription": "tsx --env-file=.env src/scripts/setupSubscription.ts",
     "dev": "tsx --env-file=.env src/scripts/example.ts",
     "script": "tsx --env-file=.env",
     "typecheck": "tsc --noEmit",
@@ -21,6 +22,7 @@
     "test:coverage": "vitest run --project unit --coverage"
   },
   "dependencies": {
+    "@faker-js/faker": "^9.0.0",
     "stripe": "^22.1.1"
   },
   "devDependencies": {
