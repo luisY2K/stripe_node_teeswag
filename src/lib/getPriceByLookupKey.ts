@@ -3,11 +3,10 @@ import { stripe } from "./stripe.js";
 
 /**
  * Returns the first active price for the given lookup key, or throws.
- * Run `npm run setup:awesome` first to create `awesome_monthly_eur`.
+ * Run `npm run setup:awesome` first to create `awesome_monthly_eur` and
+ * (for PPV) `awesome_ppv_view_eur`.
  */
-export async function getPriceByLookupKey(
-  lookupKey: string,
-): Promise<Stripe.Price> {
+export async function getPriceByLookupKey(lookupKey: string): Promise<Stripe.Price> {
   const list = await stripe.prices.list({
     lookup_keys: [lookupKey],
     active: true,

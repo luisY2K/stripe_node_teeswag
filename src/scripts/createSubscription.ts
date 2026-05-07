@@ -60,7 +60,7 @@ async function main(): Promise<void> {
   const subId =
     typeof schedule.subscription === "string"
       ? schedule.subscription
-      : schedule.subscription?.id ?? "(pending)";
+      : (schedule.subscription?.id ?? "(pending)");
 
   console.log(`Test clock:    ${clock.id}`);
   console.log(`Customer:      ${customer.id} (${name}, ${email})`);

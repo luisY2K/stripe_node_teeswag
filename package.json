@@ -10,6 +10,7 @@
     "setup:awesome": "tsx --env-file=.env src/scripts/setupAwesome.ts",
     "create:subscription": "tsx --env-file=.env src/scripts/createSubscription.ts",
     "create:subscription:trial": "tsx --env-file=.env src/scripts/createSubscriptionWithTrial.ts",
+    "create:subscription:ppv": "tsx --env-file=.env src/scripts/createSubscriptionWithPpv.ts",
     "apply:retention": "tsx --env-file=.env src/scripts/applyRetention.ts",
     "dev": "tsx --env-file=.env src/scripts/example.ts",
     "script": "tsx --env-file=.env",

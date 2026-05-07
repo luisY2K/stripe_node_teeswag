@@ -1,5 +1,6 @@
-import Stripe from "stripe";
+import type Stripe from "stripe";
 import { stripe } from "./stripe.js";
+import { findOrCreateCoupon } from "./stripeIdempotent.js";
 
 const COUPON_90 = "awesome-90-off-3m";
 const COUPON_50 = "awesome-50-off-3m";
@@ -12,21 +13,10 @@ const RETENTION_MAP: Record<string, string> = {
 };
 const PRODUCT_ID = "prod_awesome";
 
+/** Same coupon definitions as `npm run setup:awesome` via `findOrCreateCoupon`. */
 async function ensureRetentionCouponExists(couponId: string): Promise<void> {
-  try {
-    await stripe.coupons.retrieve(couponId);
-    return;
-  } catch (err: unknown) {
-    const isMissing =
-      err instanceof Stripe.errors.StripeInvalidRequestError &&
-      err.code === "resource_missing";
-    if (!isMissing) {
-      throw err;
-    }
-  }
-
   if (couponId === COUPON_100) {
-    await stripe.coupons.create({
+    await findOrCreateCoupon({
       id: COUPON_100,
       name: "Awesome 100% off (3 months)",
       percent_off: 100,
@@ -39,7 +29,7 @@ async function ensureRetentionCouponExists(couponId: string): Promise<void> {
   }
 
   if (couponId === COUPON_70) {
-    await stripe.coupons.create({
+    await findOrCreateCoupon({
       id: COUPON_70,
       name: "Awesome 70% off (3 months)",
       percent_off: 70,
@@ -105,13 +95,10 @@ export async function applyAwesomeRetention(
   }
 
   const idx = schedule.phases.findIndex(
-    (p) =>
-      p.start_date === current.start_date && p.end_date === current.end_date,
+    (p) => p.start_date === current.start_date && p.end_date === current.end_date,
   );
   if (idx < 0) {
-    throw new Error(
-      `Could not match current_phase to phases[] on ${schedule.id}.`,
-    );
+    throw new Error(`Could not match current_phase to phases[] on ${schedule.id}.`);
   }
 
   const currentPhase = schedule.phases[idx];
@@ -126,33 +113,26 @@ export async function applyAwesomeRetention(
   }
 
   const existingCouponId = firstCouponFromPhase(currentPhase);
-  if (
-    existingCouponId === undefined ||
-    !(existingCouponId in RETENTION_MAP)
-  ) {
+  if (existingCouponId === undefined || !(existingCouponId in RETENTION_MAP)) {
     throw new Error(
       `No retention mapping for current coupon ${existingCouponId ?? "<none>"}.`,
     );
   }
   const replacementCouponId = RETENTION_MAP[existingCouponId];
   if (replacementCouponId === undefined) {
-    throw new Error(
-      `Internal: missing retention coupon for ${existingCouponId}.`,
-    );
+    throw new Error(`Internal: missing retention coupon for ${existingCouponId}.`);
   }
 
   await ensureRetentionCouponExists(replacementCouponId);
 
-  const phases: Stripe.SubscriptionScheduleUpdateParams.Phase[] =
-    schedule.phases.map((p, i) => {
+  const phases: Stripe.SubscriptionScheduleUpdateParams.Phase[] = schedule.phases.map(
+    (p, i) => {
       const firstItem = p.items[0];
       if (firstItem === undefined) {
         throw new Error(`Phase on ${schedule.id} has no items`);
       }
       const priceId =
-        typeof firstItem.price === "string"
-          ? firstItem.price
-          : firstItem.price.id;
+        typeof firstItem.price === "string" ? firstItem.price : firstItem.price.id;
 
       const base: Stripe.SubscriptionScheduleUpdateParams.Phase = {
         items: [{ price: priceId, quantity: firstItem.quantity ?? 1 }],
@@ -172,16 +152,15 @@ export async function applyAwesomeRetention(
             const cid = resolveCouponId(d.coupon);
             return cid !== undefined ? { coupon: cid } : null;
           })
-          .filter(
-            (x): x is { coupon: string } => x !== null,
-          );
+          .filter((x): x is { coupon: string } => x !== null);
         if (mapped.length > 0) {
           base.discounts = mapped;
         }
       }
 
       return base;
-    });
+    },
+  );
 
   const updated = await stripe.subscriptionSchedules.update(schedule.id, {
     phases,

@@ -1,7 +1,9 @@
 import { dashboardSubscriptionUrl } from "../lib/dashboardUrl.js";
-import { createAwesomeSchedule } from "../lib/awesomeSchedule.js";
+import { createBaseWithPpvSubscription } from "../lib/createBaseWithPpvSubscription.js";
 import { makeFakeCustomer } from "../lib/fakeCustomer.js";
 import { parseMonthArg } from "../lib/parseMonthArg.js";
+import { parseViewsArg } from "../lib/parseViewsArg.js";
+import { recordPpvViews } from "../lib/recordPpvViews.js";
 import {
   advanceTestClock,
   createTestClock,
@@ -9,19 +11,19 @@ import {
 } from "../lib/testClock.js";
 import { stripe } from "../lib/stripe.js";
 
-const COUPON_90 = "awesome-90-off-3m";
-const COUPON_50 = "awesome-50-off-3m";
 const TEST_PM = "pm_card_visa";
 const DAY = 86_400;
 
 async function main(): Promise<void> {
-  const months = parseMonthArg(process.argv.slice(2));
+  const argv = process.argv.slice(2);
+  const months = parseMonthArg(argv);
+  const views = parseViewsArg(argv);
   const { name, email } = makeFakeCustomer();
 
   const nowSec = Math.floor(Date.now() / 1000);
   const clock = await createTestClock({
     frozenTime: nowSec,
-    name: `sub-trial-clock-${nowSec}`,
+    name: `sub-ppv-clock-${nowSec}`,
   });
 
   const customer = await stripe.customers.create({
@@ -38,11 +40,19 @@ async function main(): Promise<void> {
     invoice_settings: { default_payment_method: attachedPm.id },
   });
 
-  const schedule = await createAwesomeSchedule(customer.id, [
-    { kind: "trial", durationMonths: 1 },
-    { kind: "discount", couponId: COUPON_90, durationMonths: 2 },
-    { kind: "discount", couponId: COUPON_50, durationMonths: 3 },
-  ]);
+  const subscription = await createBaseWithPpvSubscription({
+    customerId: customer.id,
+    defaultPaymentMethodId: attachedPm.id,
+  });
+
+  if (views > 0) {
+    const clockState = await stripe.testHelpers.testClocks.retrieve(clock.id);
+    await recordPpvViews({
+      customerId: customer.id,
+      views,
+      timestampSec: clockState.frozen_time,
+    });
+  }
 
   if (months > 0) {
     const beforeClock = await stripe.testHelpers.testClocks.retrieve(clock.id);
@@ -58,22 +68,22 @@ async function main(): Promise<void> {
     }
   }
 
-  const subId =
-    typeof schedule.subscription === "string"
-      ? schedule.subscription
-      : (schedule.subscription?.id ?? "(pending)");
+  const items = subscription.items.data;
+  const baseItem = items[0];
+  const ppvItem = items[1];
 
   console.log(`Test clock:    ${clock.id}`);
   console.log(`Customer:      ${customer.id} (${name}, ${email})`);
-  console.log(`Schedule:      ${schedule.id}`);
-  console.log(`Subscription:  ${subId}`);
-  if (subId !== "(pending)") {
-    console.log(`Dashboard:     ${dashboardSubscriptionUrl(subId)}`);
+  console.log(`Subscription:  ${subscription.id}`);
+  if (baseItem !== undefined) {
+    console.log(`Item (base):   ${baseItem.id} (qty=${baseItem.quantity ?? "?"})`);
   }
+  if (ppvItem !== undefined) {
+    console.log(`Item (PPV):    ${ppvItem.id} (metered)`);
+  }
+  console.log(`PPV events:    ${views} view(s) recorded`);
+  console.log(`Dashboard:     ${dashboardSubscriptionUrl(subscription.id)}`);
   console.log(`Advanced:      ${months} month(s) (~${months * 30}d on clock)`);
-  console.log(
-    "Phases: 1mo trial -> 2mo 90% -> 3mo 50% -> release. Then apply:retention if needed.",
-  );
 }
 
 main().catch((err: unknown) => {

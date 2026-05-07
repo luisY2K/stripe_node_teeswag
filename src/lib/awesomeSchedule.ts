@@ -14,8 +14,8 @@ export async function createAwesomeSchedule(
 ): Promise<Stripe.SubscriptionSchedule> {
   const price = await getPriceByLookupKey(PRICE_LOOKUP_KEY);
 
-  const stripePhases: Stripe.SubscriptionScheduleCreateParams.Phase[] =
-    phases.map((p) => {
+  const stripePhases: Stripe.SubscriptionScheduleCreateParams.Phase[] = phases.map(
+    (p) => {
       const base: Stripe.SubscriptionScheduleCreateParams.Phase = {
         items: [{ price: price.id, quantity: 1 }],
         duration: { interval: "month", interval_count: p.durationMonths },
@@ -27,7 +27,8 @@ export async function createAwesomeSchedule(
         ...base,
         discounts: [{ coupon: p.couponId }],
       };
-    });
+    },
+  );
 
   return stripe.subscriptionSchedules.create({
     customer: customerId,

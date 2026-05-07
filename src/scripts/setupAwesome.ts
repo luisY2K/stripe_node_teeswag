@@ -1,10 +1,14 @@
+import { PPV_METER_EVENT_NAME, PPV_PRICE_LOOKUP_KEY } from "../lib/ppvConstants.js";
 import {
   findOrCreateCoupon,
+  findOrCreateMeterByEventName,
+  findOrCreateMeteredPriceByLookupKey,
   findOrCreatePriceByLookupKey,
   findOrCreateProductById,
 } from "../lib/stripeIdempotent.js";
 
 const PRODUCT_ID = "prod_awesome";
+const PPV_PRODUCT_ID = "prod_awesome_ppv";
 const PRICE_LOOKUP_KEY = "awesome_monthly_eur";
 
 async function main(): Promise<void> {
@@ -68,6 +72,30 @@ async function main(): Promise<void> {
     currency: "eur",
   });
   console.log(`Coupon:  ${coupon70.id} (${coupon70.percent_off}% off, 3 months)`);
+
+  const ppvProduct = await findOrCreateProductById({
+    id: PPV_PRODUCT_ID,
+    name: "Awesome PPV",
+  });
+  console.log(`Product: ${ppvProduct.id} (${ppvProduct.name})`);
+
+  const meter = await findOrCreateMeterByEventName({
+    eventName: PPV_METER_EVENT_NAME,
+    displayName: "Awesome PPV views",
+  });
+  console.log(`Meter:   ${meter.id} (event_name=${meter.event_name})`);
+
+  const ppvPrice = await findOrCreateMeteredPriceByLookupKey({
+    lookupKey: PPV_PRICE_LOOKUP_KEY,
+    product: ppvProduct.id,
+    unitAmount: 299,
+    currency: "eur",
+    interval: "month",
+    meter: meter.id,
+  });
+  console.log(
+    `Price:   ${ppvPrice.id} (${ppvPrice.currency} ${ppvPrice.unit_amount ?? "?"}/view/month metered, lookup_key=${ppvPrice.lookup_key ?? "?"})`,
+  );
 
   console.log("Done. Re-run is safe: existing objects are reused.");
 }

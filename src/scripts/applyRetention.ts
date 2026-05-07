@@ -9,8 +9,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const { scheduleId, appliedCouponId } =
-    await applyAwesomeRetention(subscriptionId);
+  const { scheduleId, appliedCouponId } = await applyAwesomeRetention(subscriptionId);
   console.log(`Schedule:        ${scheduleId}`);
   console.log(`Applied coupon:  ${appliedCouponId}`);
   console.log(`Dashboard:       ${dashboardSubscriptionUrl(subscriptionId)}`);

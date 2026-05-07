@@ -45,9 +45,7 @@ export async function waitTestClockReady(
       return clock;
     }
     if (clock.status === "internal_failure") {
-      throw new Error(
-        `Test clock ${testClockId} failed with status internal_failure`,
-      );
+      throw new Error(`Test clock ${testClockId} failed with status internal_failure`);
     }
     await sleep(pollMs);
   }
