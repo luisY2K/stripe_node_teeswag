@@ -1,4 +1,4 @@
-import type Stripe from "stripe";
+import Stripe from "stripe";
 import { stripe } from "./stripe.js";
 
 const COUPON_90 = "awesome-90-off-3m";
@@ -10,6 +10,49 @@ const RETENTION_MAP: Record<string, string> = {
   [COUPON_90]: COUPON_100,
   [COUPON_50]: COUPON_70,
 };
+const PRODUCT_ID = "prod_awesome";
+
+async function ensureRetentionCouponExists(couponId: string): Promise<void> {
+  try {
+    await stripe.coupons.retrieve(couponId);
+    return;
+  } catch (err: unknown) {
+    const isMissing =
+      err instanceof Stripe.errors.StripeInvalidRequestError &&
+      err.code === "resource_missing";
+    if (!isMissing) {
+      throw err;
+    }
+  }
+
+  if (couponId === COUPON_100) {
+    await stripe.coupons.create({
+      id: COUPON_100,
+      name: "Awesome 100% off (3 months)",
+      percent_off: 100,
+      duration: "repeating",
+      duration_in_months: 3,
+      applies_to: { products: [PRODUCT_ID] },
+      currency: "eur",
+    });
+    return;
+  }
+
+  if (couponId === COUPON_70) {
+    await stripe.coupons.create({
+      id: COUPON_70,
+      name: "Awesome 70% off (3 months)",
+      percent_off: 70,
+      duration: "repeating",
+      duration_in_months: 3,
+      applies_to: { products: [PRODUCT_ID] },
+      currency: "eur",
+    });
+    return;
+  }
+
+  throw new Error(`Unsupported retention coupon id: ${couponId}`);
+}
 
 function resolveCouponId(
   c: string | Stripe.Coupon | null | undefined,
@@ -97,6 +140,8 @@ export async function applyAwesomeRetention(
       `Internal: missing retention coupon for ${existingCouponId}.`,
     );
   }
+
+  await ensureRetentionCouponExists(replacementCouponId);
 
   const phases: Stripe.SubscriptionScheduleUpdateParams.Phase[] =
     schedule.phases.map((p, i) => {

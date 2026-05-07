@@ -16,8 +16,8 @@ npm install
 | Command | Description |
 | --- | --- |
 | `npm run setup:awesome` | Idempotent: Awesome product, 20 EUR/mo price, coupons |
-| `npm run setup:subscription` | New faker customer + schedule (90% → 50% → release) |
-| `npm run setup:subscription:trial` | Same + trial first (1mo trial → 2mo 90% → 3mo 50% → release) |
+| `npm run create:subscription` | Test clock + faker customer + schedule (90% → 50% → release); `month N` / `m N` advances clock ~N×30d |
+| `npm run create:subscription:trial` | Same with trial first; `month` / `m` as above |
 | `npm run apply:retention -- sub_...` | Swap current phase coupon (90%→100%, 50%→70%) on active schedule |
 | `npm run dev` | Run `src/scripts/example.ts` with `.env` |
 | `npm run script -- src/scripts/foo.ts` | Run any script with `.env` |
