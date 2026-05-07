@@ -52,6 +52,8 @@ Each case uses: **Setup → Stripe sketch → Customer-visible outcome → Pros 
 
 ### Case 1 — Two products, two subscriptions, same interval, aligned anchor, default proration
 
+**Run it:** `npm run create:subscription:aligned-delivery-streaming`
+
 **Setup.** `subscription_a` exists: monthly `price_a`, anchor e.g. **15th of month, 12:30:00 UTC** (match **day, hour, minute, second** so both subs agree).
 
 **Stripe sketch.** Create **`subscription_b`** for the same customer with monthly **`price_b`**, using [`billing_cycle_anchor_config`](https://docs.stripe.com/billing/subscriptions/billing-cycle) to mirror `subscription_a`:
@@ -123,6 +125,8 @@ Same mechanics as **Case 1**, framed as cross-product: `prod_a` vs `prod_b`. Ali
 
 ### Case 4 — Combined product `prod_c` carrying **both** prices, **one** subscription, **two** items
 
+**Run it:** `npm run create:subscription:bundle-two-lines`
+
 **Setup.** Create **`prod_c`** (marketing “TeeSwag bundle”) and attach **`price_a`** and **`price_b`** as prices on that product—or reference two prices that share `prod_c` depending on catalog design. Single **`subscriptions.create`** with `items[0]=price_a`, `items[1]=price_b` (and optionally metered `price_b_metered`).
 
 **Customer-visible outcome.** **One subscription** → renewals produce **one invoice** with multiple lines (simplest true consolidation).
@@ -136,6 +140,8 @@ Same mechanics as **Case 1**, framed as cross-product: `prod_a` vs `prod_b`. Ali
 ---
 
 ### Case 5 — One subscription, **two products**, two items (mixed intervals possible): `prod_a` + `prod_b`
+
+**Run it:** `npm run create:subscription:flexible-mixed-interval`
 
 **Setup.** One subscription with item 1 → `price_a` on `prod_a`, item 2 → `price_b` on `prod_b`. If **`price_a`** is yearly and **`price_b`** monthly (and metered PPV monthly), you need [**mixed interval subscriptions**](https://docs.stripe.com/billing/subscriptions/mixed-interval):
 
@@ -156,6 +162,8 @@ Same mechanics as **Case 1**, framed as cross-product: `prod_a` vs `prod_b`. Ali
 ---
 
 ### Case 6 — Add streaming to **existing** `subscription_a` (`subscriptions.update`)
+
+**Run it:** `npm run create:subscription:add-streaming-to-delivery`
 
 **Setup.** Customer keeps **`subscription_a`**; TeeSwag adds **`price_b`** (and optionally **`price_b_metered`**) via **`subscription_items.create`** / **`subscriptions.update`**.
 
@@ -277,4 +285,4 @@ flowchart TD
 
 ## Relation to this repository
 
-Today’s scripts (`create:subscription`, `create:subscription:ppv`, etc.) implement **single-customer, single-subscription** demos with [`ensureAwesomeCatalog`](../src/lib/ensureAwesomeCatalog.ts). They do **not** automate Cases 1–8 end-to-end; this document is for **architecture and partner conversations**. Extend scripts only after choosing a case and Stripe prerequisites (API version, flexible billing, metered prices).
+Today’s scripts (`create:subscription`, `create:subscription:ppv`, etc.) implement **single-customer, single-subscription** demos with [`ensureAwesomeCatalog`](../src/lib/ensureAwesomeCatalog.ts). **`npm run create:subscription:add-streaming-to-delivery`**, **`npm run create:subscription:bundle-two-lines`**, **`npm run create:subscription:flexible-mixed-interval`**, and **`npm run create:subscription:aligned-delivery-streaming`** provision catalog objects and walk through Cases 6, 4, 5, and 1 respectively in test mode (that is also the order they are listed in `package.json`). This document still frames **architecture and partner conversations** for all eight cases; extend scripts further only after choosing a case and Stripe prerequisites (API version, flexible billing, metered prices).
