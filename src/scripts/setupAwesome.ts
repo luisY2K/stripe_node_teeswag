@@ -47,6 +47,28 @@ async function main(): Promise<void> {
   });
   console.log(`Coupon:  ${coupon50.id} (${coupon50.percent_off}% off, 3 months)`);
 
+  const coupon100 = await findOrCreateCoupon({
+    id: "awesome-100-off-3m",
+    name: "Awesome 100% off (3 months)",
+    percent_off: 100,
+    duration: "repeating",
+    duration_in_months: 3,
+    applies_to: { products: [product.id] },
+    currency: "eur",
+  });
+  console.log(`Coupon:  ${coupon100.id} (${coupon100.percent_off}% off, 3 months)`);
+
+  const coupon70 = await findOrCreateCoupon({
+    id: "awesome-70-off-3m",
+    name: "Awesome 70% off (3 months)",
+    percent_off: 70,
+    duration: "repeating",
+    duration_in_months: 3,
+    applies_to: { products: [product.id] },
+    currency: "eur",
+  });
+  console.log(`Coupon:  ${coupon70.id} (${coupon70.percent_off}% off, 3 months)`);
+
   console.log("Done. Re-run is safe: existing objects are reused.");
 }
 
