@@ -40,10 +40,19 @@ async function main(): Promise<void> {
     invoice_settings: { default_payment_method: attachedPm.id },
   });
 
-  const schedule = await createAwesomeSchedule(customer.id, [
-    { kind: "discount", couponId: COUPON_90, durationMonths: 3 },
-    { kind: "discount", couponId: COUPON_50, durationMonths: 3 },
-  ]);
+  const schedule = await createAwesomeSchedule(
+    customer.id,
+    [
+      { kind: "discount", couponId: COUPON_90, durationMonths: 3 },
+      { kind: "discount", couponId: COUPON_50, durationMonths: 3 },
+    ],
+    {
+      reporting: {
+        source: "create_subscription",
+        phaseTemplate: "90_50",
+      },
+    },
+  );
 
   if (months > 0) {
     const beforeClock = await stripe.testHelpers.testClocks.retrieve(clock.id);

@@ -1,82 +1,122 @@
 import { dashboardSubscriptionUrl } from "../lib/dashboardUrl.js";
-import { createClockedCustomer } from "../lib/clockedCustomer.js";
+import { createExistingDeliveryCustomer } from "../lib/createExistingDeliveryCustomer.js";
 import { ensureAwesomeCatalog } from "../lib/ensureAwesomeCatalog.js";
 import { getPriceByLookupKey } from "../lib/getPriceByLookupKey.js";
+import { migrateCombinedSubscriptionToPhasedDiscountSchedule } from "../lib/migrateCombinedSubscriptionToPhasedDiscountSchedule.js";
 import { parseMonthArg } from "../lib/parseMonthArg.js";
-import { advanceTestClock, waitTestClockReady } from "../lib/testClock.js";
 import {
-  LOOKUP_DELIVERY_YEARLY_EUR,
+  LOOKUP_DELIVERY_MONTHLY_EUR,
   LOOKUP_STREAMING_BASE_EUR,
 } from "../lib/subscriptionCaseCatalog.js";
 import { stripe } from "../lib/stripe.js";
+import {
+  directSubscriptionMetadata,
+  lineItemMetadata,
+} from "../lib/teeswagSubscriptionMetadata.js";
 
-const DAY = 86_400;
+const COUPON_90 = "awesome-90-off-3m";
+const COUPON_50 = "awesome-50-off-3m";
 
 async function main(): Promise<void> {
   await ensureAwesomeCatalog();
 
-  const months = parseMonthArg(process.argv.slice(2));
-  const yearlyDelivery = await getPriceByLookupKey(LOOKUP_DELIVERY_YEARLY_EUR);
+  const argvMonths = parseMonthArg(process.argv.slice(2));
+  const monthsElapsed = argvMonths > 0 ? argvMonths : 5;
+
+  const monthlyDelivery = await getPriceByLookupKey(LOOKUP_DELIVERY_MONTHLY_EUR);
   const monthlyStreaming = await getPriceByLookupKey(LOOKUP_STREAMING_BASE_EUR);
 
-  const { clock, customer, paymentMethodId } = await createClockedCustomer({
-    clockNamePrefix: "add-streaming",
-  });
+  const freeTrialStreamingMonth =
+    process.argv.includes("free-trial") || process.argv.includes("--free-trial");
 
-  const subBefore = await stripe.subscriptions.create({
-    customer: customer.id,
-    default_payment_method: paymentMethodId,
-    collection_method: "charge_automatically",
-    billing_mode: { type: "flexible" },
-    items: [{ price: yearlyDelivery.id, quantity: 1 }],
-    expand: ["items"],
-  });
+  const { clock, customer, deliverySub, paymentMethodId } =
+    await createExistingDeliveryCustomer({
+      interval: "month",
+      monthsElapsed,
+      clockNamePrefix: "case6-add-stream",
+      teeswagSource: "add_streaming_to_delivery",
+    });
 
-  const deliveryItem = subBefore.items.data[0];
+  const deliveryItem = deliverySub.items.data[0];
   if (deliveryItem === undefined) {
     throw new Error("Expected delivery subscription item");
   }
 
-  if (months > 0) {
-    const beforeClock = await stripe.testHelpers.testClocks.retrieve(clock.id);
-    let currentFrozen = beforeClock.frozen_time;
-    let remainingMonths = months;
-    while (remainingMonths > 0) {
-      const stepMonths = Math.min(2, remainingMonths);
-      const stepTarget = currentFrozen + stepMonths * 30 * DAY;
-      await advanceTestClock(clock.id, stepTarget);
-      const ready = await waitTestClockReady(clock.id, { timeoutMs: 180_000 });
-      currentFrozen = ready.frozen_time;
-      remainingMonths -= stepMonths;
-    }
-  }
-
-  const subAfter = await stripe.subscriptions.update(subBefore.id, {
+  const subAfter = await stripe.subscriptions.update(deliverySub.id, {
+    default_payment_method: paymentMethodId,
+    metadata: directSubscriptionMetadata({
+      source: "add_streaming_to_delivery",
+      mix: "combined",
+      phaseTemplate: freeTrialStreamingMonth
+        ? "combined_trial100_90_50"
+        : "flex_combined_90_50",
+      hasTrial: false,
+      couponSnapshot: freeTrialStreamingMonth
+        ? `awesome-100-off-3m,${COUPON_90},${COUPON_50}`
+        : `${COUPON_90},${COUPON_50}`,
+    }),
     items: [
       {
         id: deliveryItem.id,
-        price: yearlyDelivery.id,
+        price: monthlyDelivery.id,
         quantity: 1,
+        metadata: lineItemMetadata("delivery"),
       },
       {
         price: monthlyStreaming.id,
         quantity: 1,
+        metadata: lineItemMetadata("streaming"),
       },
     ],
     proration_behavior: "create_prorations",
     expand: ["items"],
   });
 
+  const promoPhases = freeTrialStreamingMonth
+    ? [
+        {
+          kind: "discount" as const,
+          couponId: "awesome-100-off-3m",
+          durationMonths: 1,
+        },
+        { kind: "discount" as const, couponId: COUPON_90, durationMonths: 3 },
+        { kind: "discount" as const, couponId: COUPON_50, durationMonths: 3 },
+      ]
+    : [
+        { kind: "discount" as const, couponId: COUPON_90, durationMonths: 3 },
+        { kind: "discount" as const, couponId: COUPON_50, durationMonths: 3 },
+      ];
+
+  const schedule = await migrateCombinedSubscriptionToPhasedDiscountSchedule({
+    subscriptionId: subAfter.id,
+    deliveryPriceId: monthlyDelivery.id,
+    streamingPriceId: monthlyStreaming.id,
+    phases: promoPhases,
+    teeswagSource: "add_streaming_to_delivery",
+    phaseTemplate: freeTrialStreamingMonth
+      ? "combined_trial100_90_50"
+      : "flex_combined_90_50",
+    testClockId: clock.id,
+  });
+
   console.log(
-    "Add streaming to existing delivery: yearly delivery, then monthly streaming via subscriptions.update (see subscription-cases Case 6).",
+    "Case 6: monthly Awesome Delivery; add streaming then phased schedule (90%→50% on streaming by default). Monthly delivery gives enough phase runway for six promo months before renewal.",
   );
   console.log(`Test clock:     ${clock.id}`);
   console.log(`Customer:       ${customer.id}`);
   console.log(`Subscription:   ${subAfter.id}`);
-  console.log(`Items before:   1 (delivery yearly)`);
+  console.log(`Schedule:       ${schedule.id}`);
+  console.log(`Items before:   1 (delivery monthly)`);
   console.log(`Items after:    ${subAfter.items.data.length}`);
   console.log(`Dashboard:      ${dashboardSubscriptionUrl(subAfter.id)}`);
-  console.log(`Advanced clock: ${months} month(s)`);
+  console.log(
+    `Delivery age:   ${monthsElapsed} month(s) (override with: npm run ... -- m N)`,
+  );
+  console.log("");
+  console.log(
+    "Expected cadence: €12 × 3, €20 × 3, €30 … (optional: npm run … -- free-trial → €10, €12×3, €20×3, €30…).",
+  );
+  console.log("");
   console.log(
     "Cancel streaming only: subscriptionItems.delete on the streaming item; do not cancel the whole subscription.",
   );

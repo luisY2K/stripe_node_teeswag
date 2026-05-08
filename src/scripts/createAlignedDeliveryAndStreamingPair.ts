@@ -1,62 +1,70 @@
 import { dashboardSubscriptionUrl } from "../lib/dashboardUrl.js";
-import { createClockedCustomer } from "../lib/clockedCustomer.js";
-import { deriveAnchorConfig } from "../lib/deriveAnchorConfig.js";
+import { createAwesomeSchedule } from "../lib/awesomeSchedule.js";
+import { createExistingDeliveryCustomer } from "../lib/createExistingDeliveryCustomer.js";
 import { ensureAwesomeCatalog } from "../lib/ensureAwesomeCatalog.js";
-import { getPriceByLookupKey } from "../lib/getPriceByLookupKey.js";
-import {
-  LOOKUP_DELIVERY_MONTHLY_EUR,
-  LOOKUP_STREAMING_BASE_EUR,
-} from "../lib/subscriptionCaseCatalog.js";
+import { parseMonthArg } from "../lib/parseMonthArg.js";
 import { stripe } from "../lib/stripe.js";
+
+const COUPON_90 = "awesome-90-off-3m";
+const COUPON_50 = "awesome-50-off-3m";
 
 async function main(): Promise<void> {
   await ensureAwesomeCatalog();
 
-  const deliveryPrice = await getPriceByLookupKey(LOOKUP_DELIVERY_MONTHLY_EUR);
-  const streamingPrice = await getPriceByLookupKey(LOOKUP_STREAMING_BASE_EUR);
+  const argvMonths = parseMonthArg(process.argv.slice(2));
+  const monthsElapsed = argvMonths > 0 ? argvMonths : 2;
 
-  const { customer, paymentMethodId } = await createClockedCustomer({
-    clockNamePrefix: "aligned-pair",
+  const { clock, customer, deliverySub } = await createExistingDeliveryCustomer({
+    interval: "month",
+    monthsElapsed,
+    clockNamePrefix: "case1-aligned",
+    teeswagSource: "aligned_delivery_streaming",
   });
 
-  const subA = await stripe.subscriptions.create({
-    customer: customer.id,
-    default_payment_method: paymentMethodId,
-    collection_method: "charge_automatically",
-    items: [{ price: deliveryPrice.id, quantity: 1 }],
-    billing_cycle_anchor_config: {
-      day_of_month: 15,
-      hour: 12,
-      minute: 0,
-      second: 0,
+  const schedule = await createAwesomeSchedule(
+    customer.id,
+    [
+      { kind: "discount", couponId: COUPON_90, durationMonths: 3 },
+      { kind: "discount", couponId: COUPON_50, durationMonths: 3 },
+    ],
+    {
+      reporting: {
+        source: "aligned_delivery_streaming",
+        phaseTemplate: "90_50",
+      },
     },
-    expand: ["items"],
-  });
-
-  const anchorSec = subA.billing_cycle_anchor;
-  const aligned = deriveAnchorConfig(anchorSec);
-
-  const subB = await stripe.subscriptions.create({
-    customer: customer.id,
-    default_payment_method: paymentMethodId,
-    collection_method: "charge_automatically",
-    items: [{ price: streamingPrice.id, quantity: 1 }],
-    billing_cycle_anchor_config: aligned,
-    expand: ["items"],
-  });
-
-  console.log(
-    "Two subscriptions (delivery + streaming), billing_cycle_anchor_config matched (subscription-cases Case 1).",
   );
-  console.log(`Customer:       ${customer.id}`);
-  console.log(`subscription_a: ${subA.id} (delivery) anchor=${anchorSec}`);
-  console.log(`Dashboard A:    ${dashboardSubscriptionUrl(subA.id)}`);
+
+  const streamSubId =
+    typeof schedule.subscription === "string"
+      ? schedule.subscription
+      : (schedule.subscription?.id ?? "(pending)");
+
+  let streamAnchor = "(pending)";
+  if (streamSubId !== "(pending)") {
+    const streamSub = await stripe.subscriptions.retrieve(streamSubId);
+    streamAnchor = String(streamSub.billing_cycle_anchor);
+  }
+
   console.log(
-    `subscription_b: ${subB.id} (streaming base) anchor=${subB.billing_cycle_anchor}`,
+    "Case 1: existing monthly Awesome Delivery, then Awesome Stream schedule starting now (streaming-only sub; delivery anchor unchanged on delivery sub).",
   );
-  console.log(`Dashboard B:    ${dashboardSubscriptionUrl(subB.id)}`);
+  console.log(`Test clock:        ${clock.id}`);
+  console.log(`Customer:          ${customer.id}`);
   console.log(
-    "Note: Same renewal calendar, but Stripe still produces separate invoices per subscription.",
+    `Delivery sub:      ${deliverySub.id} anchor=${deliverySub.billing_cycle_anchor}`,
+  );
+  console.log(`Streaming schedule:${schedule.id}`);
+  console.log(`Streaming sub:     ${streamSubId} anchor=${streamAnchor}`);
+  if (streamSubId !== "(pending)") {
+    console.log(`Dashboard stream: ${dashboardSubscriptionUrl(streamSubId)}`);
+  }
+  console.log(`Dashboard delivery:${dashboardSubscriptionUrl(deliverySub.id)}`);
+  console.log(
+    "Two subscriptions → two invoice streams; streaming schedule uses start_date now (no past-anchor double bill on first streaming invoice).",
+  );
+  console.log(
+    "Tip: npm run apply:retention -- <streaming_subscription_id> once subscription exists.",
   );
 }
 

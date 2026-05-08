@@ -1,9 +1,6 @@
 import { PPV_METER_EVENT_NAME, PPV_PRICE_LOOKUP_KEY } from "./ppvConstants.js";
 import {
-  BUNDLE_PRODUCT_ID,
   DELIVERY_PRODUCT_ID,
-  LOOKUP_BUNDLE_DELIVERY_MONTHLY_EUR,
-  LOOKUP_BUNDLE_STREAMING_MONTHLY_EUR,
   LOOKUP_DELIVERY_MONTHLY_EUR,
   LOOKUP_DELIVERY_YEARLY_EUR,
 } from "./subscriptionCaseCatalog.js";
@@ -14,6 +11,7 @@ import {
   findOrCreatePriceByLookupKey,
   findOrCreateProductById,
 } from "./stripeIdempotent.js";
+import { stripe } from "./stripe.js";
 
 const PRODUCT_ID = "prod_awesome";
 const PPV_PRODUCT_ID = "prod_awesome_ppv";
@@ -27,7 +25,7 @@ export type EnsureAwesomeCatalogOptions = {
 /**
  * Idempotently creates the full TeeSwag / "Awesome" Stripe catalog: base product
  * and price, schedule coupons, PPV product, Billing meter, metered PPV price,
- * delivery products/prices, and bundle products/prices for subscription-case demos.
+ * delivery products/prices, and subscription-case demo prices.
  * Safe to call from every subscription script so runs succeed without a prior setup.
  */
 export async function ensureAwesomeCatalog(
@@ -42,9 +40,12 @@ export async function ensureAwesomeCatalog(
 
   const product = await findOrCreateProductById({
     id: PRODUCT_ID,
-    name: "Awesome",
+    name: "Awesome Stream",
   });
-  log(`Product: ${product.id} (${product.name})`);
+  if (product.name !== "Awesome Stream") {
+    await stripe.products.update(product.id, { name: "Awesome Stream" });
+  }
+  log(`Product: ${product.id} (Awesome Stream)`);
 
   const price = await findOrCreatePriceByLookupKey({
     lookupKey: PRICE_LOOKUP_KEY,
@@ -151,34 +152,6 @@ export async function ensureAwesomeCatalog(
   });
   log(
     `Price:   ${deliveryYearly.id} (${deliveryYearly.currency} ${deliveryYearly.unit_amount ?? "?"}/year delivery, lookup_key=${deliveryYearly.lookup_key ?? "?"})`,
-  );
-
-  const bundleProduct = await findOrCreateProductById({
-    id: BUNDLE_PRODUCT_ID,
-    name: "Awesome Bundle",
-  });
-  log(`Product: ${bundleProduct.id} (${bundleProduct.name})`);
-
-  const bundleDelivery = await findOrCreatePriceByLookupKey({
-    lookupKey: LOOKUP_BUNDLE_DELIVERY_MONTHLY_EUR,
-    product: bundleProduct.id,
-    unitAmount: 800,
-    currency: "eur",
-    interval: "month",
-  });
-  log(
-    `Price:   ${bundleDelivery.id} (bundle delivery ${bundleDelivery.unit_amount ?? "?"} cents/mo, lookup_key=${bundleDelivery.lookup_key ?? "?"})`,
-  );
-
-  const bundleStreaming = await findOrCreatePriceByLookupKey({
-    lookupKey: LOOKUP_BUNDLE_STREAMING_MONTHLY_EUR,
-    product: bundleProduct.id,
-    unitAmount: 1500,
-    currency: "eur",
-    interval: "month",
-  });
-  log(
-    `Price:   ${bundleStreaming.id} (bundle streaming ${bundleStreaming.unit_amount ?? "?"} cents/mo, lookup_key=${bundleStreaming.lookup_key ?? "?"})`,
   );
 
   if (verbose) {

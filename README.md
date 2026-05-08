@@ -6,7 +6,7 @@ Use cases mapped to the partner brief and this repo: [docs/use-cases.md](docs/us
 
 The scaffold ships an end-to-end flow:
 
-1. **Setup** the "Awesome" product, monthly EUR price, discount/retention coupons, **PPV** catalog (separate product, Billing meter, metered price), **Awesome Delivery** (monthly/yearly prices), and **Awesome Bundle** (delivery + streaming monthly prices) via `npm run setup:awesome` (idempotent). The subscription scripts also **auto-provision** the same catalog on startup if needed.
+1. **Setup** the **Awesome Stream** product (`prod_awesome`, monthly EUR price), discount/retention coupons, **PPV** catalog (separate product, Billing meter, metered price), and **Awesome Delivery** (monthly/yearly prices) via `npm run setup:awesome` (idempotent). The subscription scripts also **auto-provision** the same catalog on startup if needed.
 2. **Create** a subscription via a phased schedule (with optional trial), under a fresh test clock and faker-generated customer.
 3. **Advance** the clock by N months to simulate billing cycles.
 4. **Apply retention** to swap the current phase coupon to a richer offer.
@@ -30,25 +30,25 @@ STRIPE_SECRET_KEY=sk_test_...
 
 ## Scripts
 
-| Command                                                  | Description                                                                                                                                                                                                                |
-| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run setup:awesome`                                  | Idempotent: Awesome product, 20 EUR/mo price, discount coupons, PPV product + meter + **2.99 EUR/view** metered price, delivery + bundle prices (see catalog in [`ensureAwesomeCatalog`](src/lib/ensureAwesomeCatalog.ts)) |
-| `npm run create:subscription:add-streaming-to-delivery`  | Add monthly streaming to an existing **yearly delivery** sub (`subscriptions.update`). Optional `month N` / `m N`. Maps to **Case 6** in [`subscription-cases.md`](docs/subscription-cases.md).                            |
-| `npm run create:subscription:bundle-two-lines`           | One subscription, **Awesome Bundle** product with delivery + streaming line items. **Case 4** in [`subscription-cases.md`](docs/subscription-cases.md).                                                                    |
-| `npm run create:subscription:flexible-mixed-interval`    | **`billing_mode: flexible`**: yearly delivery + monthly streaming on one sub. **Case 5** in [`subscription-cases.md`](docs/subscription-cases.md).                                                                         |
-| `npm run create:subscription:aligned-delivery-streaming` | Two subscriptions (delivery + streaming) with matched `billing_cycle_anchor_config`. **Case 1** in [`subscription-cases.md`](docs/subscription-cases.md).                                                                  |
-| `npm run create:subscription`                            | Ensures catalog, then test clock + customer + schedule (90% → 50% → release). Optional `month N` / `m N` advances the clock by ~N×30d (chunked, 2 months/step)                                                             |
-| `npm run create:subscription:trial`                      | Same as `create:subscription` but starts with a 1-month trial (trial → 90% → 50% → release)                                                                                                                                |
-| `npm run create:subscription:ppv`                        | Ensures catalog, then base subscription + metered PPV. Optional `views K` / `v K` and `month N`                                                                                                                            |
-| `npm run apply:retention -- sub_...`                     | Ensures catalog, then swaps the current schedule phase coupon (90%→100%, 50%→70%) on the active subscription                                                                                                               |
-| `npm run dev`                                            | Run `src/scripts/example.ts` with `.env` loaded                                                                                                                                                                            |
-| `npm run script -- src/scripts/foo.ts`                   | Run any script with `.env` loaded                                                                                                                                                                                          |
-| `npm run typecheck`                                      | TypeScript check (`tsc --noEmit`)                                                                                                                                                                                          |
-| `npm run lint` / `npm run lint:fix`                      | ESLint                                                                                                                                                                                                                     |
-| `npm run format` / `npm run format:check`                | Prettier                                                                                                                                                                                                                   |
-| `npm test`                                               | Unit tests only                                                                                                                                                                                                            |
-| `npm run test:integration`                               | Stripe integration tests (requires `.env`)                                                                                                                                                                                 |
-| `npm run test:watch`                                     | Vitest watch                                                                                                                                                                                                               |
+| Command                                                  | Description                                                                                                                                                                           |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run setup:awesome`                                  | Idempotent: Awesome Stream + delivery prices, discount coupons, PPV product + meter + **2.99 EUR/view** metered price (see [`ensureAwesomeCatalog`](src/lib/ensureAwesomeCatalog.ts)) |
+| `npm run create:subscription:add-streaming-to-delivery`  | **Case 6:** yearly flexible delivery already running (~5 months default); add monthly Awesome Stream (`subscriptions.update`). Override age with `-- m N`.                            |
+| `npm run create:subscription:bundle-two-lines`           | **Case 4:** migrate delivery-only → one sub (delivery + stream) + schedule (90%→50% on streaming line). Monthly delivery ~2 months default; `-- m N`.                                 |
+| `npm run create:subscription:flexible-mixed-interval`    | **Case 5:** cancel yearly delivery with credit → new flexible sub (yearly delivery + monthly stream, 90% on streaming item). ~5 months default; `-- m N`.                             |
+| `npm run create:subscription:aligned-delivery-streaming` | **Case 1:** monthly delivery ~2 months then Awesome Stream schedule aligned to delivery anchor. Two subs, two invoice streams. `-- m N`.                                              |
+| `npm run create:subscription`                            | Ensures catalog, then test clock + customer + schedule (90% → 50% → release). Optional `month N` / `m N` advances the clock by ~N×30d (chunked, 2 months/step)                        |
+| `npm run create:subscription:trial`                      | Same as `create:subscription` but starts with a 1-month trial (trial → 90% → 50% → release)                                                                                           |
+| `npm run create:subscription:ppv`                        | Ensures catalog, then base subscription + metered PPV. Optional `views K` / `v K` and `month N`                                                                                       |
+| `npm run apply:retention -- sub_...`                     | Ensures catalog, then swaps the current schedule phase coupon (90%→100%, 50%→70%) on the active subscription                                                                          |
+| `npm run dev`                                            | Run `src/scripts/example.ts` with `.env` loaded                                                                                                                                       |
+| `npm run script -- src/scripts/foo.ts`                   | Run any script with `.env` loaded                                                                                                                                                     |
+| `npm run typecheck`                                      | TypeScript check (`tsc --noEmit`)                                                                                                                                                     |
+| `npm run lint` / `npm run lint:fix`                      | ESLint                                                                                                                                                                                |
+| `npm run format` / `npm run format:check`                | Prettier                                                                                                                                                                              |
+| `npm test`                                               | Unit tests only                                                                                                                                                                       |
+| `npm run test:integration`                               | Stripe integration tests (requires `.env`)                                                                                                                                            |
+| `npm run test:watch`                                     | Vitest watch                                                                                                                                                                          |
 
 ### Examples
 
@@ -63,7 +63,9 @@ npm run create:subscription:trial m 2
 
 npm run create:subscription:ppv views 5 month 1
 
-npm run create:subscription:add-streaming-to-delivery month 2
+npm run create:subscription:add-streaming-to-delivery -- m 12
+
+npm run create:subscription:bundle-two-lines -- m 3
 
 npm run apply:retention -- sub_1ABC...
 ```
@@ -94,7 +96,9 @@ src/
     ppvConstants.ts         # PPV meter event name + metered price lookup key
     recordPpvViews.ts       # Billing Meter Events for pay-per-view
     createBaseWithPpvSubscription.ts  # Base + metered PPV on one subscription
-    awesomeSchedule.ts      # Build phased subscription schedules
+    awesomeSchedule.ts      # Build phased subscription schedules (streaming)
+    createCombinedDeliveryStreamingSchedule.ts # Case 4: delivery + stream items, coupons on stream only
+    createExistingDeliveryCustomer.ts # Test clock + customer + delivery sub + optional clock advance
     applyRetention.ts       # Swap current phase coupon for retention coupon
     testClock.ts            # createTestClock / advanceTestClock / waitTestClockReady
     fakeCustomer.ts         # Faker-generated customer details

@@ -146,10 +146,19 @@ describe.skipIf(!hasStripeKey)("Subscription setup schedules (integration)", () 
     const coupon50 = await createPercentCoupon(resources, 50);
     const customerId = await createClockedCustomer(resources);
 
-    const schedule = await createAwesomeSchedule(customerId, [
-      { kind: "discount", couponId: coupon90, durationMonths: 3 },
-      { kind: "discount", couponId: coupon50, durationMonths: 3 },
-    ]);
+    const schedule = await createAwesomeSchedule(
+      customerId,
+      [
+        { kind: "discount", couponId: coupon90, durationMonths: 3 },
+        { kind: "discount", couponId: coupon50, durationMonths: 3 },
+      ],
+      {
+        reporting: {
+          source: "integration_test_case_a",
+          phaseTemplate: "90_50",
+        },
+      },
+    );
     resources.scheduleIds.push(schedule.id);
     if (typeof schedule.subscription === "string") {
       resources.subscriptionIds.push(schedule.subscription);
@@ -190,11 +199,20 @@ describe.skipIf(!hasStripeKey)("Subscription setup schedules (integration)", () 
     const coupon50 = await createPercentCoupon(resources, 50);
     const customerId = await createClockedCustomer(resources);
 
-    const schedule = await createAwesomeSchedule(customerId, [
-      { kind: "trial", durationMonths: 1 },
-      { kind: "discount", couponId: coupon90, durationMonths: 2 },
-      { kind: "discount", couponId: coupon50, durationMonths: 3 },
-    ]);
+    const schedule = await createAwesomeSchedule(
+      customerId,
+      [
+        { kind: "trial", durationMonths: 1 },
+        { kind: "discount", couponId: coupon90, durationMonths: 2 },
+        { kind: "discount", couponId: coupon50, durationMonths: 3 },
+      ],
+      {
+        reporting: {
+          source: "integration_test_case_b",
+          phaseTemplate: "trial_90_50",
+        },
+      },
+    );
     resources.scheduleIds.push(schedule.id);
     if (typeof schedule.subscription === "string") {
       resources.subscriptionIds.push(schedule.subscription);

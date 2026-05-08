@@ -45,6 +45,7 @@ async function main(): Promise<void> {
   const subscription = await createBaseWithPpvSubscription({
     customerId: customer.id,
     defaultPaymentMethodId: attachedPm.id,
+    teeswagSource: "create_subscription_ppv",
   });
 
   if (views > 0) {
