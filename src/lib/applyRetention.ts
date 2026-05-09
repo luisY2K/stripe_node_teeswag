@@ -18,7 +18,7 @@ async function ensureRetentionCouponExists(couponId: string): Promise<void> {
   if (couponId === COUPON_100) {
     await findOrCreateCoupon({
       id: COUPON_100,
-      name: "Awesome 100% off (3 months)",
+      name: "Awesome 100%",
       percent_off: 100,
       duration: "repeating",
       duration_in_months: 3,
@@ -31,7 +31,7 @@ async function ensureRetentionCouponExists(couponId: string): Promise<void> {
   if (couponId === COUPON_70) {
     await findOrCreateCoupon({
       id: COUPON_70,
-      name: "Awesome 70% off (3 months)",
+      name: "Awesome 70%",
       percent_off: 70,
       duration: "repeating",
       duration_in_months: 3,

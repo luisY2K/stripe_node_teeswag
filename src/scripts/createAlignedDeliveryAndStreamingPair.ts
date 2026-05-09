@@ -4,11 +4,14 @@ import { createExistingDeliveryCustomer } from "../lib/createExistingDeliveryCus
 import { ensureAwesomeCatalog } from "../lib/ensureAwesomeCatalog.js";
 import { parseMonthArg } from "../lib/parseMonthArg.js";
 import { stripe } from "../lib/stripe.js";
+import { syncInvoiceCadenceMetadataForSubscription } from "../lib/syncInvoiceCadenceMetadata.js";
+import { advanceTestClockByMonths } from "../lib/testClock.js";
 
 const COUPON_90 = "awesome-90-off-3m";
 const COUPON_50 = "awesome-50-off-3m";
 
 async function main(): Promise<void> {
+  const runStartedAt = Math.floor(Date.now() / 1000);
   await ensureAwesomeCatalog();
 
   const argvMonths = parseMonthArg(process.argv.slice(2));
@@ -35,6 +38,8 @@ async function main(): Promise<void> {
     },
   );
 
+  await advanceTestClockByMonths(clock.id, 2);
+
   const streamSubId =
     typeof schedule.subscription === "string"
       ? schedule.subscription
@@ -45,9 +50,23 @@ async function main(): Promise<void> {
     const streamSub = await stripe.subscriptions.retrieve(streamSubId);
     streamAnchor = String(streamSub.billing_cycle_anchor);
   }
+  const deliveryTagged = await syncInvoiceCadenceMetadataForSubscription({
+    subscriptionId: deliverySub.id,
+    createdGte: runStartedAt,
+  });
+  let streamingTagged = 0;
+  if (streamSubId !== "(pending)") {
+    streamingTagged = await syncInvoiceCadenceMetadataForSubscription({
+      subscriptionId: streamSubId,
+      createdGte: runStartedAt,
+    });
+  }
 
   console.log(
     "Case 1: existing monthly Awesome Delivery, then Awesome Stream schedule starting now (streaming-only sub; delivery anchor unchanged on delivery sub).",
+  );
+  console.log(
+    "Clock advanced +2 month(s) after delivery + streaming subscriptions exist.",
   );
   console.log(`Test clock:        ${clock.id}`);
   console.log(`Customer:          ${customer.id}`);
@@ -60,6 +79,9 @@ async function main(): Promise<void> {
     console.log(`Dashboard stream: ${dashboardSubscriptionUrl(streamSubId)}`);
   }
   console.log(`Dashboard delivery:${dashboardSubscriptionUrl(deliverySub.id)}`);
+  console.log(
+    `Invoices tagged with cadence: delivery=${deliveryTagged}, streaming=${streamingTagged}`,
+  );
   console.log(
     "Two subscriptions → two invoice streams; streaming schedule uses start_date now (no past-anchor double bill on first streaming invoice).",
   );

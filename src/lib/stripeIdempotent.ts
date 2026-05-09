@@ -118,7 +118,16 @@ export async function findOrCreateCoupon(
   const { id, ...createParams } = params;
 
   try {
-    return await stripe.coupons.retrieve(id);
+    const existing = await stripe.coupons.retrieve(id);
+    const desiredName = createParams.name;
+    if (
+      typeof desiredName === "string" &&
+      desiredName !== "" &&
+      existing.name !== desiredName
+    ) {
+      return await stripe.coupons.update(id, { name: desiredName });
+    }
+    return existing;
   } catch (error: unknown) {
     if (!isResourceMissing(error)) {
       throw error;

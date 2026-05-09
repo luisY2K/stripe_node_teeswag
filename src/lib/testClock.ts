@@ -2,6 +2,53 @@ import type Stripe from "stripe";
 import { stripe } from "./stripe.js";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const DAY = 86_400;
+
+/**
+ * Advance a test clock forward by N × ~30 days, in steps of at most 2 months
+ * (Stripe test clocks work reliably with chunked advances for monthly subs).
+ */
+export async function advanceTestClockByMonths(
+  testClockId: string,
+  months: number,
+  options: { waitTimeoutMs?: number } = {},
+): Promise<Stripe.Response<Stripe.TestHelpers.TestClock>> {
+  const waitTimeoutMs = options.waitTimeoutMs ?? 180_000;
+  if (months <= 0) {
+    return retrieveTestClock(testClockId);
+  }
+
+  let currentFrozen = (await retrieveTestClock(testClockId)).frozen_time;
+  let remainingMonths = months;
+  let lastReady: Stripe.Response<Stripe.TestHelpers.TestClock> | undefined;
+  while (remainingMonths > 0) {
+    const stepMonths = Math.min(2, remainingMonths);
+    const stepTarget = currentFrozen + stepMonths * 30 * DAY;
+    await advanceTestClock(testClockId, stepTarget);
+    lastReady = await waitTestClockReady(testClockId, { timeoutMs: waitTimeoutMs });
+    currentFrozen = lastReady.frozen_time;
+    remainingMonths -= stepMonths;
+  }
+  return lastReady ?? retrieveTestClock(testClockId);
+}
+
+/**
+ * Advance a test clock by N days (single step).
+ */
+export async function advanceTestClockByDays(
+  testClockId: string,
+  days: number,
+  options: { waitTimeoutMs?: number } = {},
+): Promise<Stripe.Response<Stripe.TestHelpers.TestClock>> {
+  const waitTimeoutMs = options.waitTimeoutMs ?? 180_000;
+  if (days <= 0) {
+    return retrieveTestClock(testClockId);
+  }
+  const current = await retrieveTestClock(testClockId);
+  const target = current.frozen_time + days * DAY;
+  await advanceTestClock(testClockId, target);
+  return waitTestClockReady(testClockId, { timeoutMs: waitTimeoutMs });
+}
 
 export async function createTestClock(params: {
   frozenTime: number;

@@ -11,6 +11,8 @@ import {
   subscriptionScheduleObjectMetadata,
 } from "./teeswagSubscriptionMetadata.js";
 
+const STREAMING_FULL_DISCOUNT_COUPON = "awesome-100-off-3m";
+
 /** Discount phases only; delivery line has no coupon; streaming line carries the coupon per phase. */
 export type CombinedDiscountPhase = {
   kind: "discount";
@@ -30,6 +32,9 @@ export async function createCombinedDeliveryStreamingSchedule(
   const deliveryPrice = await getPriceByLookupKey(LOOKUP_DELIVERY_MONTHLY_EUR);
   const streamingPrice = await getPriceByLookupKey(LOOKUP_STREAMING_BASE_EUR);
   const scheduleSource = options.teeswagSource ?? "bundle_two_lines";
+  const freeTrialStreaming = phases.some(
+    (p) => p.couponId === STREAMING_FULL_DISCOUNT_COUPON,
+  );
 
   const stripePhases: Stripe.SubscriptionScheduleCreateParams.Phase[] = phases.map(
     (p) => ({
@@ -37,7 +42,10 @@ export async function createCombinedDeliveryStreamingSchedule(
         source: scheduleSource,
         mix: "combined",
         phaseTemplate: "combined_90_50",
-        hasTrialThisPhase: false,
+        hasTrialThisPhase: p.couponId === STREAMING_FULL_DISCOUNT_COUPON,
+        deliveryCadence: "month",
+        streamCadence: "month",
+        freeTrialStreaming,
         couponSnapshot: p.couponId,
       }),
       items: [
@@ -64,7 +72,9 @@ export async function createCombinedDeliveryStreamingSchedule(
     customer: customerId,
     start_date: startDate,
     end_behavior: "release",
-    metadata: subscriptionScheduleObjectMetadata(scheduleSource),
+    metadata: subscriptionScheduleObjectMetadata(scheduleSource, {
+      freeTrialStreaming,
+    }),
     default_settings: {
       collection_method: "charge_automatically",
     },

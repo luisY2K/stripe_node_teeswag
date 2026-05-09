@@ -5,14 +5,12 @@ import {
   LOOKUP_DELIVERY_MONTHLY_EUR,
   LOOKUP_DELIVERY_YEARLY_EUR,
 } from "./subscriptionCaseCatalog.js";
-import { advanceTestClock, waitTestClockReady } from "./testClock.js";
+import { advanceTestClockByMonths } from "./testClock.js";
 import { stripe } from "./stripe.js";
 import {
   directSubscriptionMetadata,
   lineItemMetadata,
 } from "./teeswagSubscriptionMetadata.js";
-
-const DAY = 86_400;
 
 /**
  * Test clock + customer + existing Awesome Delivery subscription, optionally advanced
@@ -49,6 +47,7 @@ export async function createExistingDeliveryCustomer(params: {
       mix: "delivery_only",
       phaseTemplate: "none",
       hasTrial: false,
+      deliveryCadence: params.interval,
     }),
     items: [
       {
@@ -66,17 +65,7 @@ export async function createExistingDeliveryCustomer(params: {
   let deliverySub = await stripe.subscriptions.create(createParams);
 
   if (params.monthsElapsed > 0) {
-    const beforeClock = await stripe.testHelpers.testClocks.retrieve(clock.id);
-    let currentFrozen = beforeClock.frozen_time;
-    let remainingMonths = params.monthsElapsed;
-    while (remainingMonths > 0) {
-      const stepMonths = Math.min(2, remainingMonths);
-      const stepTarget = currentFrozen + stepMonths * 30 * DAY;
-      await advanceTestClock(clock.id, stepTarget);
-      const ready = await waitTestClockReady(clock.id, { timeoutMs: 180_000 });
-      currentFrozen = ready.frozen_time;
-      remainingMonths -= stepMonths;
-    }
+    await advanceTestClockByMonths(clock.id, params.monthsElapsed);
   }
 
   deliverySub = await stripe.subscriptions.retrieve(deliverySub.id, {

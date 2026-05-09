@@ -34,6 +34,7 @@ export async function createAwesomeSchedule(
         mix: "streaming_only",
         phaseTemplate: options.reporting.phaseTemplate,
         hasTrialThisPhase: p.kind === "trial",
+        streamCadence: "month",
         couponSnapshot: p.kind === "discount" ? p.couponId : undefined,
       });
 

@@ -28,6 +28,7 @@ export async function createBaseWithPpvSubscription(params: {
       mix: "base_plus_ppv",
       phaseTemplate: "none",
       hasTrial: false,
+      streamCadence: "month",
     }),
     items: [
       {

@@ -3,6 +3,8 @@ import {
   DELIVERY_PRODUCT_ID,
   LOOKUP_DELIVERY_MONTHLY_EUR,
   LOOKUP_DELIVERY_YEARLY_EUR,
+  LOOKUP_STREAMING_FREE_EUR,
+  LOOKUP_STREAMING_STUB_EUR,
 } from "./subscriptionCaseCatalog.js";
 import {
   findOrCreateCoupon,
@@ -58,9 +60,31 @@ export async function ensureAwesomeCatalog(
     `Price:   ${price.id} (${price.currency} ${price.unit_amount ?? "?"}/month, lookup_key=${price.lookup_key ?? "?"})`,
   );
 
+  const stubPrice = await findOrCreatePriceByLookupKey({
+    lookupKey: LOOKUP_STREAMING_STUB_EUR,
+    product: product.id,
+    unitAmount: 200,
+    currency: "eur",
+    interval: "month",
+  });
+  log(
+    `Price:   ${stubPrice.id} (${stubPrice.currency} ${stubPrice.unit_amount ?? "?"}/month stub, lookup_key=${stubPrice.lookup_key ?? "?"})`,
+  );
+
+  const freeStubPrice = await findOrCreatePriceByLookupKey({
+    lookupKey: LOOKUP_STREAMING_FREE_EUR,
+    product: product.id,
+    unitAmount: 0,
+    currency: "eur",
+    interval: "month",
+  });
+  log(
+    `Price:   ${freeStubPrice.id} (${freeStubPrice.currency} ${freeStubPrice.unit_amount ?? "?"}/month free-stub, lookup_key=${freeStubPrice.lookup_key ?? "?"})`,
+  );
+
   const coupon90 = await findOrCreateCoupon({
     id: "awesome-90-off-3m",
-    name: "Awesome 90% off (3 months)",
+    name: "Awesome 90%",
     percent_off: 90,
     duration: "repeating",
     duration_in_months: 3,
@@ -71,7 +95,7 @@ export async function ensureAwesomeCatalog(
 
   const coupon50 = await findOrCreateCoupon({
     id: "awesome-50-off-3m",
-    name: "Awesome 50% off (3 months)",
+    name: "Awesome 50%",
     percent_off: 50,
     duration: "repeating",
     duration_in_months: 3,
@@ -82,7 +106,7 @@ export async function ensureAwesomeCatalog(
 
   const coupon100 = await findOrCreateCoupon({
     id: "awesome-100-off-3m",
-    name: "Awesome 100% off (3 months)",
+    name: "Awesome 100%",
     percent_off: 100,
     duration: "repeating",
     duration_in_months: 3,
@@ -93,7 +117,7 @@ export async function ensureAwesomeCatalog(
 
   const coupon70 = await findOrCreateCoupon({
     id: "awesome-70-off-3m",
-    name: "Awesome 70% off (3 months)",
+    name: "Awesome 70%",
     percent_off: 70,
     duration: "repeating",
     duration_in_months: 3,

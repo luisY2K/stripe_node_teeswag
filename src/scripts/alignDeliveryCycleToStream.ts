@@ -5,67 +5,65 @@ import { getPriceByLookupKey } from "../lib/getPriceByLookupKey.js";
 import { migrateCombinedSubscriptionToPhasedDiscountSchedule } from "../lib/migrateCombinedSubscriptionToPhasedDiscountSchedule.js";
 import { parseMonthArg } from "../lib/parseMonthArg.js";
 import {
-  LOOKUP_DELIVERY_YEARLY_EUR,
+  LOOKUP_DELIVERY_MONTHLY_EUR,
   LOOKUP_STREAMING_BASE_EUR,
 } from "../lib/subscriptionCaseCatalog.js";
-import { syncInvoiceCadenceMetadataForSubscription } from "../lib/syncInvoiceCadenceMetadata.js";
 import { stripe } from "../lib/stripe.js";
 import {
   directSubscriptionMetadata,
   lineItemMetadata,
 } from "../lib/teeswagSubscriptionMetadata.js";
 
+const COUPON_100 = "awesome-100-off-3m";
 const COUPON_90 = "awesome-90-off-3m";
 const COUPON_50 = "awesome-50-off-3m";
 
 async function main(): Promise<void> {
-  const runStartedAt = Math.floor(Date.now() / 1000);
   await ensureAwesomeCatalog();
 
   const argvMonths = parseMonthArg(process.argv.slice(2));
   const monthsElapsed = argvMonths > 0 ? argvMonths : 2;
+  const freeTrialStreamingMonth =
+    process.argv.includes("free-trial") || process.argv.includes("--free-trial");
 
-  const yearlyDelivery = await getPriceByLookupKey(LOOKUP_DELIVERY_YEARLY_EUR);
+  const monthlyDelivery = await getPriceByLookupKey(LOOKUP_DELIVERY_MONTHLY_EUR);
   const monthlyStreaming = await getPriceByLookupKey(LOOKUP_STREAMING_BASE_EUR);
 
   const { clock, customer, deliverySub, paymentMethodId } =
     await createExistingDeliveryCustomer({
       interval: "year",
       monthsElapsed,
-      clockNamePrefix: "case5-flex",
-      teeswagSource: "flexible_mixed_interval",
+      clockNamePrefix: "case7-align-cycle",
+      teeswagSource: "align_delivery_cycle_to_stream",
     });
 
-  await stripe.subscriptions.cancel(deliverySub.id, {
-    prorate: true,
-    invoice_now: true,
-  });
+  const deliveryItem = deliverySub.items.data[0];
+  if (deliveryItem === undefined) {
+    throw new Error("Expected delivery subscription item");
+  }
 
-  const freeTrialStreamingMonth =
-    process.argv.includes("free-trial") || process.argv.includes("--free-trial");
+  const phaseTemplate = freeTrialStreamingMonth
+    ? "aligned_cycle_trial100_90_50"
+    : "aligned_cycle_90_50";
 
-  const subscription = await stripe.subscriptions.create({
-    customer: customer.id,
+  const subAfter = await stripe.subscriptions.update(deliverySub.id, {
     default_payment_method: paymentMethodId,
-    collection_method: "charge_automatically",
-    billing_mode: { type: "flexible" },
     metadata: directSubscriptionMetadata({
-      source: "flexible_mixed_interval",
+      source: "align_delivery_cycle_to_stream",
       mix: "combined",
-      phaseTemplate: freeTrialStreamingMonth
-        ? "flex_combined_trial100_90_50"
-        : "flex_combined_90_50",
+      phaseTemplate,
       hasTrial: freeTrialStreamingMonth,
-      deliveryCadence: "year",
+      deliveryCadence: "month",
       streamCadence: "month",
       freeTrialStreaming: freeTrialStreamingMonth,
       couponSnapshot: freeTrialStreamingMonth
-        ? `awesome-100-off-3m,${COUPON_90},${COUPON_50}`
+        ? `${COUPON_100},${COUPON_90},${COUPON_50}`
         : `${COUPON_90},${COUPON_50}`,
     }),
     items: [
       {
-        price: yearlyDelivery.id,
+        id: deliveryItem.id,
+        price: monthlyDelivery.id,
         quantity: 1,
         metadata: lineItemMetadata("delivery"),
       },
@@ -75,16 +73,23 @@ async function main(): Promise<void> {
         metadata: lineItemMetadata("streaming"),
       },
     ],
-    expand: ["items.data.price"],
+    proration_behavior: "create_prorations",
+    expand: ["items"],
   });
+
+  const streamingItem = subAfter.items.data.find((it) => {
+    const pid = typeof it.price === "string" ? it.price : it.price?.id;
+    return pid === monthlyStreaming.id;
+  });
+  if (streamingItem?.current_period_end === undefined) {
+    throw new Error(
+      "Expected streaming item current_period_end after cycle alignment update",
+    );
+  }
 
   const promoPhases = freeTrialStreamingMonth
     ? [
-        {
-          kind: "discount" as const,
-          couponId: "awesome-100-off-3m",
-          durationMonths: 1,
-        },
+        { kind: "discount" as const, couponId: COUPON_100, durationMonths: 1 },
         { kind: "discount" as const, couponId: COUPON_90, durationMonths: 2 },
         { kind: "discount" as const, couponId: COUPON_50, durationMonths: 3 },
       ]
@@ -94,21 +99,16 @@ async function main(): Promise<void> {
       ];
 
   const schedule = await migrateCombinedSubscriptionToPhasedDiscountSchedule({
-    subscriptionId: subscription.id,
-    deliveryPriceId: yearlyDelivery.id,
+    subscriptionId: subAfter.id,
+    deliveryPriceId: monthlyDelivery.id,
     streamingPriceId: monthlyStreaming.id,
     phases: promoPhases,
-    teeswagSource: "flexible_mixed_interval",
-    phaseTemplate: freeTrialStreamingMonth
-      ? "flex_combined_trial100_90_50"
-      : "flex_combined_90_50",
-    deliveryCadence: "year",
+    teeswagSource: "align_delivery_cycle_to_stream",
+    phaseTemplate,
+    deliveryCadence: "month",
     streamCadence: "month",
+    promoStartAt: streamingItem.current_period_end,
     testClockId: clock.id,
-  });
-  const cadenceInvoicesUpdated = await syncInvoiceCadenceMetadataForSubscription({
-    subscriptionId: subscription.id,
-    createdGte: runStartedAt,
   });
 
   const invoices = await stripe.invoices.list({
@@ -117,35 +117,28 @@ async function main(): Promise<void> {
   });
 
   console.log(
-    "Case 5: yearly flexible delivery-only → cancel with credit → new flexible sub (yearly delivery + monthly stream). Anchor is **now** (no past anchor double-charge). Phased 90%→50% on streaming via subscription_schedule migration.",
+    "Case 7: yearly delivery converted to monthly at add-stream time (create_prorations), then anchor-aligned phased discounts on streaming.",
   );
   console.log(`Test clock:     ${clock.id}`);
   console.log(`Customer:       ${customer.id}`);
-  console.log(`Canceled sub:   ${deliverySub.id}`);
-  console.log(`New sub:        ${subscription.id}`);
+  console.log(`Subscription:   ${subAfter.id}`);
   console.log(`Schedule:       ${schedule.id}`);
-  console.log(`Dashboard:      ${dashboardSubscriptionUrl(subscription.id)}`);
-  console.log(`Invoices tagged with cadence: ${cadenceInvoicesUpdated}`);
-
-  for (const it of subscription.items.data) {
-    const price =
-      typeof it.price === "string" ? it.price : (it.price?.lookup_key ?? it.price?.id);
-    console.log(
-      `Item ${it.id}: period ${it.current_period_start} → ${it.current_period_end} price=${price}`,
-    );
-  }
-
-  console.log("Recent invoices:");
+  console.log(`Dashboard:      ${dashboardSubscriptionUrl(subAfter.id)}`);
+  console.log(
+    `Delivery age:   ${monthsElapsed} month(s) (override with: npm run ... -- m N)`,
+  );
+  console.log(
+    freeTrialStreamingMonth
+      ? "Expected ladder: 100%×1 -> 90%×2 -> 50%×3 (delivery+stream aligned monthly)."
+      : "Expected ladder: 90%×3 -> 50%×3 (delivery+stream aligned monthly).",
+  );
+  console.log("Recent invoices (look for yearly->monthly proration credit):");
   for (const inv of invoices.data) {
     const cents = inv.amount_due ?? inv.total ?? 0;
     console.log(
       `  ${inv.id}  ${inv.status}  ${cents / 100} ${inv.currency?.toUpperCase() ?? ""}`,
     );
   }
-  console.log(
-    "Expected cadence (no trial flag): €12 × 3 (90%), €20 × 3 (50%), €30 … — first invoice single period (anchor now).",
-  );
-  console.log("Optional: npm run … -- free-trial → €10, then €12×2, €20×3, €30…");
 }
 
 main().catch((err: unknown) => {

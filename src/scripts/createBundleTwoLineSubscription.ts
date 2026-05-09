@@ -3,12 +3,14 @@ import { createCombinedDeliveryStreamingSchedule } from "../lib/createCombinedDe
 import { createExistingDeliveryCustomer } from "../lib/createExistingDeliveryCustomer.js";
 import { ensureAwesomeCatalog } from "../lib/ensureAwesomeCatalog.js";
 import { parseMonthArg } from "../lib/parseMonthArg.js";
+import { syncInvoiceCadenceMetadataForSubscription } from "../lib/syncInvoiceCadenceMetadata.js";
 import { stripe } from "../lib/stripe.js";
 
 const COUPON_90 = "awesome-90-off-3m";
 const COUPON_50 = "awesome-50-off-3m";
 
 async function main(): Promise<void> {
+  const runStartedAt = Math.floor(Date.now() / 1000);
   await ensureAwesomeCatalog();
 
   const argvMonths = parseMonthArg(process.argv.slice(2));
@@ -36,7 +38,7 @@ async function main(): Promise<void> {
           couponId: "awesome-100-off-3m",
           durationMonths: 1,
         },
-        { kind: "discount" as const, couponId: COUPON_90, durationMonths: 3 },
+        { kind: "discount" as const, couponId: COUPON_90, durationMonths: 2 },
         { kind: "discount" as const, couponId: COUPON_50, durationMonths: 3 },
       ]
     : [
@@ -54,6 +56,17 @@ async function main(): Promise<void> {
     typeof schedule.subscription === "string"
       ? schedule.subscription
       : (schedule.subscription?.id ?? "(pending)");
+  const deliveryTagged = await syncInvoiceCadenceMetadataForSubscription({
+    subscriptionId: deliverySub.id,
+    createdGte: runStartedAt,
+  });
+  let combinedTagged = 0;
+  if (subId !== "(pending)") {
+    combinedTagged = await syncInvoiceCadenceMetadataForSubscription({
+      subscriptionId: subId,
+      createdGte: runStartedAt,
+    });
+  }
 
   const invoices = await stripe.invoices.list({
     customer: customer.id,
@@ -81,10 +94,13 @@ async function main(): Promise<void> {
     );
   }
   console.log(
+    `Invoices tagged with cadence: delivery=${deliveryTagged}, combined=${combinedTagged}`,
+  );
+  console.log(
     "Coupons apply only to Awesome Stream (prod_awesome): applies_to.products + item-level discounts on streaming.",
   );
   console.log(
-    "Optional: npm run … -- free-trial for cadence €10 (100% off stream), €12×3, €20×3, €30…",
+    "Optional: npm run … -- free-trial for cadence €10 (100% off stream), €12×2, €20×3, €30…",
   );
 }
 

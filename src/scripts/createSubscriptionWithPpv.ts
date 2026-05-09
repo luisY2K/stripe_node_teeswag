@@ -11,11 +11,13 @@ import {
   waitTestClockReady,
 } from "../lib/testClock.js";
 import { stripe } from "../lib/stripe.js";
+import { syncInvoiceCadenceMetadataForSubscription } from "../lib/syncInvoiceCadenceMetadata.js";
 
 const TEST_PM = "pm_card_visa";
 const DAY = 86_400;
 
 async function main(): Promise<void> {
+  const runStartedAt = Math.floor(Date.now() / 1000);
   await ensureAwesomeCatalog();
   const argv = process.argv.slice(2);
   const months = parseMonthArg(argv);
@@ -72,6 +74,10 @@ async function main(): Promise<void> {
   }
 
   const items = subscription.items.data;
+  const cadenceInvoicesUpdated = await syncInvoiceCadenceMetadataForSubscription({
+    subscriptionId: subscription.id,
+    createdGte: runStartedAt,
+  });
   const baseItem = items[0];
   const ppvItem = items[1];
 
@@ -87,6 +93,7 @@ async function main(): Promise<void> {
   console.log(`PPV events:    ${views} view(s) recorded`);
   console.log(`Dashboard:     ${dashboardSubscriptionUrl(subscription.id)}`);
   console.log(`Advanced:      ${months} month(s) (~${months * 30}d on clock)`);
+  console.log(`Invoices tagged with cadence: ${cadenceInvoicesUpdated}`);
 }
 
 main().catch((err: unknown) => {

@@ -9,6 +9,7 @@ import {
   waitTestClockReady,
 } from "../lib/testClock.js";
 import { stripe } from "../lib/stripe.js";
+import { syncInvoiceCadenceMetadataForSubscription } from "../lib/syncInvoiceCadenceMetadata.js";
 
 const COUPON_90 = "awesome-90-off-3m";
 const COUPON_50 = "awesome-50-off-3m";
@@ -16,6 +17,7 @@ const TEST_PM = "pm_card_visa";
 const DAY = 86_400;
 
 async function main(): Promise<void> {
+  const runStartedAt = Math.floor(Date.now() / 1000);
   await ensureAwesomeCatalog();
   const months = parseMonthArg(process.argv.slice(2));
   const { name, email } = makeFakeCustomer();
@@ -72,6 +74,13 @@ async function main(): Promise<void> {
     typeof schedule.subscription === "string"
       ? schedule.subscription
       : (schedule.subscription?.id ?? "(pending)");
+  let cadenceInvoicesUpdated = 0;
+  if (subId !== "(pending)") {
+    cadenceInvoicesUpdated = await syncInvoiceCadenceMetadataForSubscription({
+      subscriptionId: subId,
+      createdGte: runStartedAt,
+    });
+  }
 
   console.log(`Test clock:    ${clock.id}`);
   console.log(`Customer:      ${customer.id} (${name}, ${email})`);
@@ -81,6 +90,7 @@ async function main(): Promise<void> {
     console.log(`Dashboard:     ${dashboardSubscriptionUrl(subId)}`);
   }
   console.log(`Advanced:      ${months} month(s) (~${months * 30}d on clock)`);
+  console.log(`Invoices tagged with cadence: ${cadenceInvoicesUpdated}`);
   console.log(
     "Tip: npm run apply:retention -- <subscription_id> to swap current phase coupon.",
   );
