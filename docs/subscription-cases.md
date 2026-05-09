@@ -178,7 +178,7 @@ Same mechanics as **Case 1**, framed as cross-product: `prod_a` vs `prod_b`. Ali
 
 **Run it:** `npm run create:subscription:add-streaming-to-delivery`
 
-**Demo script.** **Monthly Awesome Delivery** already running (~**2 months** default after delivery create). **`subscriptions.update`** adds monthly Awesome Stream with **`proration_behavior: create_prorations`**. The schedule builder then applies explicit **anchor-aligned phases** (no budget clamping): optional lead, stub segment, promo ladder, full-price tail (see [`migrateCombinedSubscriptionToPhasedDiscountSchedule`](src/lib/migrateCombinedSubscriptionToPhasedDiscountSchedule.ts)).
+**Demo script.** **Monthly Awesome Delivery** already running (~**2 months** default after delivery create). **`subscriptions.update`** adds monthly Awesome Stream with **`proration_behavior: create_prorations`**. The script then performs schedule migration inline (`subscriptionSchedules.create({ from_subscription })` -> `retrieve` -> `update`) and handles Stripe phase-start constraints with an explicit bridge segment when needed.
 
 **Simulated tenure:** advance the test clock after delivery creation by passing **`m` and `N` as separate argv tokens** after `--` (for example `npm run create:subscription:add-streaming-to-delivery -- m 4 stub long`). A single token like `m4` is **not** parsed.
 
@@ -186,7 +186,10 @@ Same mechanics as **Case 1**, framed as cross-product: `prod_a` vs `prod_b`. Ali
 
 **Stub pricing policy:** without `free-trial`, streaming uses `awesome_stream_stub_eur` (10% of list) during the stub segment; with `free-trial`, stub streaming uses `awesome_stream_free_eur` (€0).
 
-**Promo ladder (always, after stub segment):** **90% × 3 → 50% × 3 → full-price tail** (same coupons); free-trial differs only by **€0 stub** vs stub-priced stub.
+**Promo ladder (after stub segment):**
+
+- default: **90% × 3 → 50% × 3 → 1-month full-price tail**
+- `free-trial`: **trial=true × 1 month → 90% × 2 → 50% × 3 → 1-month full-price tail**
 
 **Why add-stream can still show stub + full month on one invoice:** With **`billing_mode: flexible`** and **`create_prorations`**, the first post-update invoice can combine a **proration stub** and a **full period**—documented in Stripe mixed-interval behavior; monthly delivery maximizes runway so phased coupons are not cut short.
 
@@ -216,19 +219,6 @@ Use **`billing_mode[type]=flexible`** when delivery and streaming intervals diff
 **Cons.** Subscription is **schedule-managed** after migration; cancel **streaming only** → **`subscription_items.delete`** on the streaming item, **not** `subscriptions.cancel`.
 
 **Gotchas.** Mixed-interval / flexible-mode caveats as Case 5. Yearly delivery + elapsed months can leave **too little time** before `phase_end` for six full discounted streaming months (90×3 + 50×3)—in that case prefer Case 5 recreation or shorten elapsed months in the demo.
-
-#### Spike: stub bridge phase carries a promo coupon
-
-**Run it:** `npm run create:subscription:add-streaming-stub-promo`
-
-Exploratory script ([`addStreamingToDeliverySubscriptionStubPromo.ts`](src/scripts/addStreamingToDeliverySubscriptionStubPromo.ts)): same flow as Case 6 (monthly delivery, add streaming, schedule migration), but the **stub segment** uses **list streaming price + a coupon** on the schedule phase instead of the stub lookup price with no coupon.
-
-- **Default:** stub **`awesome-90-off-3m`** → **90% × 3 → 50% × 3** after the anchor.
-- **`free-trial`:** stub **`awesome-100-off-3m`** → **100% × 1 → 90% × 2 → 50% × 3** after the anchor (`streaming`-only discount via coupon; delivery keeps charging).
-
-**Run with free-trial:** `npm run create:subscription:add-streaming-stub-promo -- free-trial` (optional **`stub long`** for ~18d; default positioning matches Case 6 **~7d** before delivery period end). **`m N`** uses the same token rules as Case 6.
-
-**Stripe caveat:** Without `free-trial`, stub + ladder reuse **`awesome-90-off-3m`** (repeating / 3 months in catalog). With **`free-trial`**, stub **and** the first ladder phase both reference **`awesome-100-off-3m`**; confirm invoices and phase discounts in the Dashboard. If duration stacking or duplicate application misbehaves, introduce companion **`duration: once`** coupons (e.g. stub-only) via [`ensureAwesomeCatalog`](src/lib/ensureAwesomeCatalog.ts).
 
 ---
 
