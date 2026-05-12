@@ -1,20 +1,26 @@
+import { randomUUID } from "node:crypto";
 import { dashboardSubscriptionUrl } from "../lib/dashboardUrl.js";
-import { createBaseWithPpvSubscription } from "../lib/createBaseWithPpvSubscription.js";
 import { ensureAwesomeCatalog } from "../lib/ensureAwesomeCatalog.js";
 import { makeFakeCustomer } from "../lib/fakeCustomer.js";
+import { getPriceByLookupKey } from "../lib/getPriceByLookupKey.js";
 import { parseMonthArg } from "../lib/parseMonthArg.js";
 import { parseViewsArg } from "../lib/parseViewsArg.js";
-import { recordPpvViews } from "../lib/recordPpvViews.js";
+import { PPV_METER_EVENT_NAME, PPV_PRICE_LOOKUP_KEY } from "../lib/ppvConstants.js";
 import {
   advanceTestClock,
   createTestClock,
   waitTestClockReady,
 } from "../lib/testClock.js";
 import { stripe } from "../lib/stripe.js";
+import {
+  directSubscriptionMetadata,
+  lineItemMetadata,
+} from "../lib/teeswagSubscriptionMetadata.js";
 import { syncInvoiceCadenceMetadataForSubscription } from "../lib/syncInvoiceCadenceMetadata.js";
 
 const TEST_PM = "pm_card_visa";
 const DAY = 86_400;
+const SOURCE = "create_subscription_ppv";
 
 async function main(): Promise<void> {
   const runStartedAt = Math.floor(Date.now() / 1000);
@@ -44,19 +50,44 @@ async function main(): Promise<void> {
     invoice_settings: { default_payment_method: attachedPm.id },
   });
 
-  const subscription = await createBaseWithPpvSubscription({
-    customerId: customer.id,
-    defaultPaymentMethodId: attachedPm.id,
-    teeswagSource: "create_subscription_ppv",
+  const basePrice = await getPriceByLookupKey("awesome_monthly_eur");
+  const ppvPrice = await getPriceByLookupKey(PPV_PRICE_LOOKUP_KEY);
+
+  const subscription = await stripe.subscriptions.create({
+    customer: customer.id,
+    metadata: directSubscriptionMetadata({
+      source: SOURCE,
+      mix: "base_plus_ppv",
+      phaseTemplate: "none",
+      hasTrial: false,
+      streamCadence: "month",
+    }),
+    items: [
+      {
+        price: basePrice.id,
+        quantity: 1,
+        metadata: lineItemMetadata("streaming"),
+      },
+      { price: ppvPrice.id, metadata: lineItemMetadata("ppv_metered") },
+    ],
+    default_payment_method: attachedPm.id,
+    collection_method: "charge_automatically",
+    expand: ["items"],
   });
 
   if (views > 0) {
     const clockState = await stripe.testHelpers.testClocks.retrieve(clock.id);
-    await recordPpvViews({
-      customerId: customer.id,
-      views,
-      timestampSec: clockState.frozen_time,
-    });
+    for (let i = 0; i < views; i++) {
+      await stripe.billing.meterEvents.create({
+        event_name: PPV_METER_EVENT_NAME,
+        payload: {
+          stripe_customer_id: customer.id,
+          value: "1",
+        },
+        identifier: randomUUID(),
+        timestamp: clockState.frozen_time,
+      });
+    }
   }
 
   if (months > 0) {

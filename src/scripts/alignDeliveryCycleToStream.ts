@@ -1,22 +1,30 @@
+import type Stripe from "stripe";
+import { createClockedCustomer } from "../lib/clockedCustomer.js";
 import { dashboardSubscriptionUrl } from "../lib/dashboardUrl.js";
-import { createExistingDeliveryCustomer } from "../lib/createExistingDeliveryCustomer.js";
 import { ensureAwesomeCatalog } from "../lib/ensureAwesomeCatalog.js";
 import { getPriceByLookupKey } from "../lib/getPriceByLookupKey.js";
-import { migrateCombinedSubscriptionToPhasedDiscountSchedule } from "../lib/migrateCombinedSubscriptionToPhasedDiscountSchedule.js";
 import { parseMonthArg } from "../lib/parseMonthArg.js";
 import {
   LOOKUP_DELIVERY_MONTHLY_EUR,
+  LOOKUP_DELIVERY_YEARLY_EUR,
   LOOKUP_STREAMING_BASE_EUR,
 } from "../lib/subscriptionCaseCatalog.js";
 import { stripe } from "../lib/stripe.js";
+import { advanceTestClockByMonths } from "../lib/testClock.js";
 import {
   directSubscriptionMetadata,
   lineItemMetadata,
+  schedulePhaseMetadataForSubscription,
+  subscriptionScheduleObjectMetadata,
 } from "../lib/teeswagSubscriptionMetadata.js";
 
 const COUPON_100 = "awesome-100-off-3m";
 const COUPON_90 = "awesome-90-off-3m";
 const COUPON_50 = "awesome-50-off-3m";
+const MONTH_SEC = 30 * 86_400;
+const PHASE_MERGE_EPS_SEC = 120;
+const PHASE_END_SLACK_SEC = 120;
+const SOURCE = "align_delivery_cycle_to_stream";
 
 async function main(): Promise<void> {
   await ensureAwesomeCatalog();
@@ -27,16 +35,45 @@ async function main(): Promise<void> {
     process.argv.includes("free-trial") || process.argv.includes("--free-trial");
 
   const monthlyDelivery = await getPriceByLookupKey(LOOKUP_DELIVERY_MONTHLY_EUR);
+  const yearlyDelivery = await getPriceByLookupKey(LOOKUP_DELIVERY_YEARLY_EUR);
   const monthlyStreaming = await getPriceByLookupKey(LOOKUP_STREAMING_BASE_EUR);
 
-  const { clock, customer, deliverySub, paymentMethodId } =
-    await createExistingDeliveryCustomer({
-      interval: "year",
-      monthsElapsed,
-      clockNamePrefix: "case7-align-cycle",
-      teeswagSource: "align_delivery_cycle_to_stream",
-    });
+  // --- Existing delivery customer (yearly interval, advanced N months) ---
+  const { clock, customer, paymentMethodId } = await createClockedCustomer({
+    clockNamePrefix: "case7-align-cycle",
+  });
 
+  let deliverySub = await stripe.subscriptions.create({
+    customer: customer.id,
+    default_payment_method: paymentMethodId,
+    collection_method: "charge_automatically",
+    billing_mode: { type: "flexible" },
+    metadata: directSubscriptionMetadata({
+      source: SOURCE,
+      mix: "delivery_only",
+      phaseTemplate: "none",
+      hasTrial: false,
+      deliveryCadence: "year",
+    }),
+    items: [
+      {
+        price: yearlyDelivery.id,
+        quantity: 1,
+        metadata: lineItemMetadata("delivery"),
+      },
+    ],
+    expand: ["items"],
+  });
+
+  if (monthsElapsed > 0) {
+    await advanceTestClockByMonths(clock.id, monthsElapsed);
+  }
+
+  deliverySub = await stripe.subscriptions.retrieve(deliverySub.id, {
+    expand: ["items"],
+  });
+
+  // --- Add streaming to the delivery subscription ---
   const deliveryItem = deliverySub.items.data[0];
   if (deliveryItem === undefined) {
     throw new Error("Expected delivery subscription item");
@@ -49,7 +86,7 @@ async function main(): Promise<void> {
   const subAfter = await stripe.subscriptions.update(deliverySub.id, {
     default_payment_method: paymentMethodId,
     metadata: directSubscriptionMetadata({
-      source: "align_delivery_cycle_to_stream",
+      source: SOURCE,
       mix: "combined",
       phaseTemplate,
       hasTrial: freeTrialStreamingMonth,
@@ -86,29 +123,141 @@ async function main(): Promise<void> {
       "Expected streaming item current_period_end after cycle alignment update",
     );
   }
+  const promoStart = streamingItem.current_period_end;
 
-  const promoPhases = freeTrialStreamingMonth
-    ? [
-        { kind: "discount" as const, couponId: COUPON_100, durationMonths: 1 },
-        { kind: "discount" as const, couponId: COUPON_90, durationMonths: 2 },
-        { kind: "discount" as const, couponId: COUPON_50, durationMonths: 3 },
-      ]
-    : [
-        { kind: "discount" as const, couponId: COUPON_90, durationMonths: 3 },
-        { kind: "discount" as const, couponId: COUPON_50, durationMonths: 3 },
-      ];
+  // --- Migrate to phased discount schedule (from_subscription → update phases) ---
+  const promoPhases: { couponId: string; durationMonths: number }[] =
+    freeTrialStreamingMonth
+      ? [
+          { couponId: COUPON_100, durationMonths: 1 },
+          { couponId: COUPON_90, durationMonths: 2 },
+          { couponId: COUPON_50, durationMonths: 3 },
+        ]
+      : [
+          { couponId: COUPON_90, durationMonths: 3 },
+          { couponId: COUPON_50, durationMonths: 3 },
+        ];
 
-  const schedule = await migrateCombinedSubscriptionToPhasedDiscountSchedule({
-    subscriptionId: subAfter.id,
-    deliveryPriceId: monthlyDelivery.id,
-    streamingPriceId: monthlyStreaming.id,
-    phases: promoPhases,
-    teeswagSource: "align_delivery_cycle_to_stream",
-    phaseTemplate,
-    deliveryCadence: "month",
-    streamCadence: "month",
-    promoStartAt: streamingItem.current_period_end,
-    testClockId: clock.id,
+  const createdSchedule = await stripe.subscriptionSchedules.create({
+    from_subscription: subAfter.id,
+  });
+  const retrieved = await stripe.subscriptionSchedules.retrieve(createdSchedule.id);
+  const phaseStart = retrieved.phases[0]?.start_date;
+  if (phaseStart === undefined) {
+    throw new Error("Schedule missing phases[0].start_date after from_subscription");
+  }
+
+  const tc = await stripe.testHelpers.testClocks.retrieve(clock.id);
+  const billingNow = tc.frozen_time + PHASE_END_SLACK_SEC;
+
+  function itemsWithCoupon(
+    couponId?: string,
+  ): Stripe.SubscriptionScheduleUpdateParams.Phase.Item[] {
+    const streamItem: Stripe.SubscriptionScheduleUpdateParams.Phase.Item = {
+      price: monthlyStreaming.id,
+      quantity: 1,
+      metadata: lineItemMetadata("streaming"),
+    };
+    if (couponId !== undefined) {
+      streamItem.discounts = [{ coupon: couponId }];
+    }
+    return [
+      {
+        price: monthlyDelivery.id,
+        quantity: 1,
+        metadata: lineItemMetadata("delivery"),
+      },
+      streamItem,
+    ];
+  }
+
+  const phases: Stripe.SubscriptionScheduleUpdateParams.Phase[] = [];
+
+  const stubStart = Math.max(
+    streamingItem.current_period_start ?? billingNow,
+    billingNow,
+  );
+
+  if (phaseStart < stubStart - PHASE_MERGE_EPS_SEC) {
+    phases.push({
+      start_date: phaseStart,
+      end_date: stubStart,
+      metadata: schedulePhaseMetadataForSubscription({
+        source: SOURCE,
+        mix: "combined",
+        phaseTemplate,
+        hasTrialThisPhase: false,
+        deliveryCadence: "month",
+        streamCadence: "month",
+        freeTrialStreaming: freeTrialStreamingMonth,
+      }),
+      items: itemsWithCoupon(),
+    });
+  }
+
+  if (stubStart < promoStart - PHASE_MERGE_EPS_SEC) {
+    phases.push({
+      start_date: stubStart,
+      end_date: promoStart,
+      metadata: schedulePhaseMetadataForSubscription({
+        source: SOURCE,
+        mix: "combined",
+        phaseTemplate,
+        hasTrialThisPhase: false,
+        deliveryCadence: "month",
+        streamCadence: "month",
+        freeTrialStreaming: freeTrialStreamingMonth,
+      }),
+      items: itemsWithCoupon(),
+    });
+  }
+
+  let cursor = promoStart;
+  for (const phase of promoPhases) {
+    const segEnd = cursor + phase.durationMonths * MONTH_SEC;
+    phases.push({
+      start_date: cursor,
+      end_date: segEnd,
+      metadata: schedulePhaseMetadataForSubscription({
+        source: SOURCE,
+        mix: "combined",
+        phaseTemplate,
+        hasTrialThisPhase: phase.couponId === COUPON_100,
+        deliveryCadence: "month",
+        streamCadence: "month",
+        freeTrialStreaming: freeTrialStreamingMonth,
+        couponSnapshot: phase.couponId,
+      }),
+      items: itemsWithCoupon(phase.couponId),
+    });
+    cursor = segEnd;
+  }
+
+  phases.push({
+    start_date: cursor,
+    end_date: cursor + MONTH_SEC,
+    metadata: schedulePhaseMetadataForSubscription({
+      source: SOURCE,
+      mix: "combined",
+      phaseTemplate,
+      hasTrialThisPhase: false,
+      deliveryCadence: "month",
+      streamCadence: "month",
+      freeTrialStreaming: freeTrialStreamingMonth,
+    }),
+    items: itemsWithCoupon(),
+  });
+
+  const schedule = await stripe.subscriptionSchedules.update(createdSchedule.id, {
+    phases,
+    end_behavior: "release",
+    metadata: subscriptionScheduleObjectMetadata(SOURCE, {
+      freeTrialStreaming: freeTrialStreamingMonth,
+    }),
+    default_settings: {
+      collection_method: "charge_automatically",
+    },
+    expand: ["subscription"],
   });
 
   const invoices = await stripe.invoices.list({
