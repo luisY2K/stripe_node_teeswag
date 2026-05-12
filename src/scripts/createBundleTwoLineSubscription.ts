@@ -20,7 +20,7 @@ import {
 
 const COUPON_100 = "awesome-100-off-3m";
 const COUPON_90 = "awesome-90-off-3m";
-const COUPON_50 = "awesome-50-off-3m";
+const COUPON_50 = "awesome-50-off-6m";
 const SOURCE = "bundle_two_lines";
 
 async function main(): Promise<void> {
@@ -78,14 +78,14 @@ async function main(): Promise<void> {
   // --- Create combined schedule (delivery + streaming, phased discounts on streaming) ---
   const promoPhases: { couponId: string; durationMonths: number }[] =
     freeTrialStreamingMonth
-      ? [
+      ?         [
           { couponId: COUPON_100, durationMonths: 1 },
           { couponId: COUPON_90, durationMonths: 2 },
-          { couponId: COUPON_50, durationMonths: 3 },
+          { couponId: COUPON_50, durationMonths: 6 },
         ]
       : [
           { couponId: COUPON_90, durationMonths: 3 },
-          { couponId: COUPON_50, durationMonths: 3 },
+          { couponId: COUPON_50, durationMonths: 6 },
         ];
 
   const freeTrialStreaming = promoPhases.some((p) => p.couponId === COUPON_100);

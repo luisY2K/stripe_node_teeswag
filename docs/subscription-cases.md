@@ -140,7 +140,7 @@ Same mechanics as **Case 1**, framed as cross-product: `prod_a` vs `prod_b`. Ali
 
 **Run it:** `npm run create:subscription:bundle-two-lines`
 
-**Demo script.** Models **migration**: customer already has **monthly Awesome Delivery** (~**2 months** on the clock by default; `m N`). **`subscriptions.cancel`** with **`prorate`** + **`invoice_now`** issues a **credit** for unused delivery time. Then **`subscription_schedules.create`** builds **one** subscription with **two items**: delivery + streaming, with **90% → 50%** phases **only on the streaming item** (delivery stays full price). **`start_date`** is **`now`** (subscription schedule default)—**do not** reuse the canceled sub’s anchor here or the **first invoice can bill two monthly periods at once** (~€24 instead of €12). **Customer-visible cadence:** **€12 × 3**, **€20 × 3**, then **€30**… Optional **`free-trial`** (`npm run … -- free-trial`): lead phase uses **`awesome-100-off-3m`** on streaming for one month → **€10**, then **€12 × 2** (90% is two months so total promo stays six months with the trial), **€20 × 3**, **€30**….
+**Demo script.** Models **migration**: customer already has **monthly Awesome Delivery** (~**2 months** on the clock by default; `m N`). **`subscriptions.cancel`** with **`prorate`** + **`invoice_now`** issues a **credit** for unused delivery time. Then **`subscription_schedules.create`** builds **one** subscription with **two items**: delivery + streaming, with **90% → 50%** phases **only on the streaming item** (delivery stays full price). **`start_date`** is **`now`** (subscription schedule default)—**do not** reuse the canceled sub’s anchor here or the **first invoice can bill two monthly periods at once** (~€24 instead of €12). **Customer-visible cadence:** **€12 × 3**, **€20 × 6**, then **€30**… Optional **`free-trial`** (`npm run … -- free-trial`): lead phase uses **`awesome-100-off-3m`** on streaming for one month → **€10**, then **€12 × 2** (90% is two months so total promo window is nine months with the trial), **€20 × 6**, **€30**….
 
 **Setup (conceptual).** In partner docs, **`prod_c`** is sometimes a marketing “bundle” with **`price_a`** and **`price_b`** on the same product. This repo’s demo uses **two real products** (`Awesome Delivery` + **Awesome Stream** / `prod_awesome`) on **one** subscription—invoice lines still show both product names.
 
@@ -158,7 +158,7 @@ Same mechanics as **Case 1**, framed as cross-product: `prod_a` vs `prod_b`. Ali
 
 **Run it:** `npm run create:subscription:flexible-mixed-interval`
 
-**Demo script.** Starts from **yearly flexible Awesome Delivery** (~**2 months** elapsed by default; `m N`). Cancels with **`prorate`** + **`invoice_now`** (credit for unused months). Creates a new **`billing_mode: flexible`** subscription with **yearly** delivery + **monthly** Awesome Stream — **no preserved `billing_cycle_anchor`** (defaults to **now**, avoiding a **€24-style first invoice**). Migrates to a **`subscription_schedule`** with phased **90% → 50%** on the streaming item only (same helper as add-streaming-to-delivery). **Cadence on streaming renewals:** **€12 × 3**, **€20 × 3**, **€30**…. Optional **`free-trial`** (`npm run … -- free-trial`): **€10**, then **€12 × 2**, **€20 × 3**, **€30**…. **`npm run apply:retention`** does not swap these item-level phased coupons.
+**Demo script.** Starts from **yearly flexible Awesome Delivery** (~**2 months** elapsed by default; `m N`). Cancels with **`prorate`** + **`invoice_now`** (credit for unused months). Creates a new **`billing_mode: flexible`** subscription with **yearly** delivery + **monthly** Awesome Stream — **no preserved `billing_cycle_anchor`** (defaults to **now**, avoiding a **€24-style first invoice**). Migrates to a **`subscription_schedule`** with phased **90% → 50%** on the streaming item only (same helper as add-streaming-to-delivery). **Cadence on streaming renewals:** **€12 × 3**, **€20 × 6**, **€30**…. Optional **`free-trial`** (`npm run … -- free-trial`): **€10**, then **€12 × 2**, **€20 × 6**, **€30**…. **`npm run apply:retention`** does not swap these item-level phased coupons.
 
 **Setup.** One subscription with item 1 → `price_a` on `prod_a`, item 2 → `price_b` on `prod_b`. If **`price_a`** is yearly and **`price_b`** monthly (and metered PPV monthly), you need [**mixed interval subscriptions**](https://docs.stripe.com/billing/subscriptions/mixed-interval):
 
@@ -192,8 +192,8 @@ Same mechanics as **Case 1**, framed as cross-product: `prod_a` vs `prod_b`. Ali
 
 **Promo ladder (after stub segment):**
 
-- default: **90% × 3 → 50% × 3 → 1-month full-price tail**
-- `free-trial`: **trial=true × 1 month → 90% × 2 → 50% × 3 → 1-month full-price tail**
+- default: **90% × 3 → 50% × 6 → 1-month full-price tail**
+- `free-trial`: **trial=true × 1 month → 90% × 2 → 50% × 6 → 1-month full-price tail**
 
 **Why add-stream can still show stub + full month on one invoice:** With **`billing_mode: flexible`** and **`create_prorations`**, the first post-update invoice can combine a **proration stub** and a **full period**—documented in Stripe mixed-interval behavior; monthly delivery maximizes runway so phased coupons are not cut short.
 
@@ -222,7 +222,7 @@ Use **`billing_mode[type]=flexible`** when delivery and streaming intervals diff
 
 **Cons.** Subscription is **schedule-managed** after migration; cancel **streaming only** → **`subscription_items.delete`** on the streaming item, **not** `subscriptions.cancel`.
 
-**Gotchas.** Mixed-interval / flexible-mode caveats as Case 5. Yearly delivery + elapsed months can leave **too little time** before `phase_end` for six full discounted streaming months (90×3 + 50×3)—in that case prefer Case 5 recreation or shorten elapsed months in the demo.
+**Gotchas.** Mixed-interval / flexible-mode caveats as Case 5. Yearly delivery + elapsed months can leave **too little time** before `phase_end` for nine full discounted streaming months (90×3 + 50×6)—in that case prefer Case 5 recreation or shorten elapsed months in the demo.
 
 ---
 
@@ -234,8 +234,8 @@ Use **`billing_mode[type]=flexible`** when delivery and streaming intervals diff
 
 **Demo script.** Start from yearly delivery, then on add-stream call **`subscriptions.update`** to switch delivery to monthly and add monthly streaming under **`proration_behavior: create_prorations`**. The yearly unused time becomes customer credit and absorbs the stub period. With both items aligned to the same monthly anchor, apply phased streaming discounts cleanly:
 
-- default: **90% × 3 → 50% × 3**
-- `free-trial`: **100% × 1 → 90% × 2 → 50% × 3**
+- default: **90% × 3 → 50% × 6**
+- `free-trial`: **100% × 1 → 90% × 2 → 50% × 6**
 
 **Customer-visible outcome.** One subscription, one monthly anchor for both lines, deterministic phase ladder, and a visible proration credit from cadence realignment.
 

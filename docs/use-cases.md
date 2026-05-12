@@ -53,7 +53,7 @@ Each item below maps **intent → how to run or inspect it** in code.
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `npm run create:subscription` | [`src/scripts/createSubscription.ts`](../src/scripts/createSubscription.ts), [`src/lib/awesomeSchedule.ts`](../src/lib/awesomeSchedule.ts) |
 
-**Nuance vs the PDF example:** The partner brief mentions **90% off for an initial period** and **50% off for a longer follow-on period** (for example, three months then six months). The default script uses **three months at 90%** and **three months at 50%**—a deliberate **prototype shape**, not a verbatim copy of every number in the PDF. Coupons are still named with “3m” in their ids; durations are set per phase in the script.
+**Alignment with the PDF example:** The partner brief mentions **90% off for an initial period** and **50% off for a longer follow-on period** (three months then six months). The default script now matches that shape exactly: **three months at 90%** (`awesome-90-off-3m`) then **six months at 50%** (`awesome-50-off-6m`). Durations are set per phase in the script.
 
 ### Introductory “first period free”
 
@@ -65,7 +65,7 @@ Each item below maps **intent → how to run or inspect it** in code.
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `npm run create:subscription:trial` | [`src/scripts/createSubscriptionWithTrial.ts`](../src/scripts/createSubscriptionWithTrial.ts), [`createAwesomeSchedule`](../src/lib/awesomeSchedule.ts) |
 
-**Phase lengths in this script:** **1 month trial**, then **2 months at 90%**, then **3 months at 50%** (then release). This differs from the no-trial script’s **3 + 3** discount-only phases—both are intentionally parameterized in code.
+**Phase lengths in this script:** **1 month trial**, then **2 months at 90%**, then **6 months at 50%** (then release). This differs from the no-trial script’s **3 + 6** discount-only phases—both are intentionally parameterized in code.
 
 ### Simulated billing over time
 
@@ -81,7 +81,7 @@ Each item below maps **intent → how to run or inspect it** in code.
 
 **Intent:** Offer a **flat recurring base** (streaming catalog access) and **usage-based pay-per-view** (exclusive title unlocks) on **one subscription**—combined line items on renewal invoices once the metered item exists.
 
-**Implementation (default, no CLI args):** [`createSubscriptionWithPpv.ts`](../src/scripts/createSubscriptionWithPpv.ts) creates a **subscription schedule** with two discount phases (**90%×3 → 50%×3**, then `end_behavior: release`) on the base streaming price only. After advancing the test clock by ~**37 days** (mid–phase 1), it **`subscriptions.update`** adds the metered PPV item with **`proration_behavior: create_prorations`**, then **rewrites** the schedule’s phases so both phases include base + metered items (PPV survives into phase 2). It then emits **5** Billing Meter Events (`stripe.billing.meterEvents.create`), one per view, spaced **2** days apart on the clock. Metered price: **EUR 3 per view** per period ([`ppvConstants.ts`](../src/lib/ppvConstants.ts)).
+**Implementation (default, no CLI args):** [`createSubscriptionWithPpv.ts`](../src/scripts/createSubscriptionWithPpv.ts) creates a **subscription schedule** with two discount phases (**90%×3 → 50%×6**, then `end_behavior: release`) on the base streaming price only. After advancing the test clock by ~**37 days** (mid–phase 1), it **`subscriptions.update`** adds the metered PPV item with **`proration_behavior: create_prorations`**, then **rewrites** the schedule’s phases so both phases include base + metered items (PPV survives into phase 2). It then emits **5** Billing Meter Events (`stripe.billing.meterEvents.create`), one per view, spaced **2** days apart on the clock. Metered price: **EUR 3 per view** per period ([`ppvConstants.ts`](../src/lib/ppvConstants.ts)).
 
 **Implementation (legacy CLI):** With arguments such as `views K` / `v K` and `month N` / `m N`, the script runs a simpler flow: **`subscriptions.create`** with licensed monthly + metered items from **t=0**, optional burst meter events, then optional multi-month clock advance (two-month steps).
 
@@ -105,7 +105,7 @@ Each item below maps **intent → how to run or inspect it** in code.
 
 **Intent:** Same win-back behavior as above, packaged for a **single demo run** without copying a subscription id from a prior script.
 
-**Implementation:** Creates a test clock, customer, and **subscription schedule** (90%×3 → 50%×3, `end_behavior: release`), advances the clock **4 months** (lands in the **50%** phase), then calls **`applyAwesomeRetention`** from [`src/lib/applyRetention.ts`](../src/lib/applyRetention.ts) to swap the current phase coupon to **`awesome-70-off-3m`** (50% → 70%). Prints the Stripe Dashboard URL, schedule id, applied coupon id, **customer ad-hoc promotion** bump count, and cadence-tagged invoice count.
+**Implementation:** Creates a test clock, customer, and **subscription schedule** (90%×3 → 50%×6, `end_behavior: release`), advances the clock **4 months** (lands in the **50%** phase), then calls **`applyAwesomeRetention`** from [`src/lib/applyRetention.ts`](../src/lib/applyRetention.ts) to swap the current phase coupon to **`awesome-70-off-6m`** (50% → 70%). Prints the Stripe Dashboard URL, schedule id, applied coupon id, **customer ad-hoc promotion** bump count, and cadence-tagged invoice count.
 
 | How to run                              | Source                                                                                                                                 |
 | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |

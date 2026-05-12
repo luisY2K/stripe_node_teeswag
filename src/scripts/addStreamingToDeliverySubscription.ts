@@ -29,7 +29,7 @@ import {
 
 const SOURCE = "add_streaming_to_delivery";
 const COUPON_90 = "awesome-90-off-3m";
-const COUPON_50 = "awesome-50-off-3m";
+const COUPON_50 = "awesome-50-off-6m";
 const DAY = 86_400;
 const MONTH_SEC = 30 * DAY;
 const PHASE_MERGE_EPS_SEC = 120;
@@ -296,7 +296,7 @@ async function main(): Promise<void> {
     cursor += 2 * MONTH_SEC;
     phases.push({
       start_date: cursor,
-      end_date: cursor + 3 * MONTH_SEC,
+      end_date: cursor + 6 * MONTH_SEC,
       metadata: schedulePhaseMetadataForSubscription({
         source: SOURCE,
         mix: "combined",
@@ -309,7 +309,7 @@ async function main(): Promise<void> {
       }),
       items: items50,
     });
-    cursor += 3 * MONTH_SEC;
+    cursor += 6 * MONTH_SEC;
   } else {
     phases.push({
       start_date: cursor,
@@ -329,7 +329,7 @@ async function main(): Promise<void> {
     cursor += 3 * MONTH_SEC;
     phases.push({
       start_date: cursor,
-      end_date: cursor + 3 * MONTH_SEC,
+      end_date: cursor + 6 * MONTH_SEC,
       metadata: schedulePhaseMetadataForSubscription({
         source: SOURCE,
         mix: "combined",
@@ -342,7 +342,7 @@ async function main(): Promise<void> {
       }),
       items: items50,
     });
-    cursor += 3 * MONTH_SEC;
+    cursor += 6 * MONTH_SEC;
   }
 
   phases.push({
@@ -380,8 +380,8 @@ async function main(): Promise<void> {
 
   console.log(
     freeTrial
-      ? "Add-streaming-to-delivery consolidated (free-trial): delivery charged throughout; streaming €0 for bridge + 1mo, then 90%×2, 50%×3, tail 1mo."
-      : "Add-streaming-to-delivery consolidated: bridge monthly streaming + 90% coupon, then 90%×3, 50%×3, tail 1mo.",
+      ? "Add-streaming-to-delivery consolidated (free-trial): delivery charged throughout; streaming €0 for bridge + 1mo, then 90%×2, 50%×6, tail 1mo."
+      : "Add-streaming-to-delivery consolidated: bridge monthly streaming + 90% coupon, then 90%×3, 50%×6, tail 1mo.",
   );
   console.log(`Test clock:     ${clock.id}`);
   console.log(`Customer:       ${customer.id}`);

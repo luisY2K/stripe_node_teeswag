@@ -26,7 +26,7 @@ const TEST_PM = "pm_card_visa";
 const DAY = 86_400;
 const SOURCE = "create_subscription_ppv";
 const COUPON_90 = "awesome-90-off-3m";
-const COUPON_50 = "awesome-50-off-3m";
+const COUPON_50 = "awesome-50-off-6m";
 const DEFAULT_ADD_PPV_AFTER_DAYS = 37;
 const DEFAULT_VIEW_COUNT = 5;
 const DEFAULT_VIEW_SPACING_DAYS = 2;
@@ -97,7 +97,7 @@ async function runDefaultScenario(): Promise<void> {
             metadata: lineItemMetadata("streaming"),
           },
         ],
-        duration: { interval: "month", interval_count: 3 },
+        duration: { interval: "month", interval_count: 6 },
         discounts: [{ coupon: COUPON_50 }],
         metadata: schedulePhaseMetadataForSubscription({
           source: SOURCE,

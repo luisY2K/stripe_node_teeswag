@@ -15,7 +15,7 @@ import {
 } from "../lib/teeswagSubscriptionMetadata.js";
 
 const COUPON_90 = "awesome-90-off-3m";
-const COUPON_50 = "awesome-50-off-3m";
+const COUPON_50 = "awesome-50-off-6m";
 const SOURCE = "aligned_delivery_streaming";
 
 async function main(): Promise<void> {
@@ -87,7 +87,7 @@ async function main(): Promise<void> {
       },
       {
         items: [{ price: streamingPrice.id, quantity: 1 }],
-        duration: { interval: "month", interval_count: 3 },
+        duration: { interval: "month", interval_count: 6 },
         discounts: [{ coupon: COUPON_50 }],
         metadata: schedulePhaseMetadataForSubscription({
           source: SOURCE,

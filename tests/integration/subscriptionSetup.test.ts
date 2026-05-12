@@ -150,7 +150,7 @@ describe.skipIf(!hasStripeKey)("Subscription setup schedules (integration)", () 
       customerId,
       [
         { kind: "discount", couponId: coupon90, durationMonths: 3 },
-        { kind: "discount", couponId: coupon50, durationMonths: 3 },
+        { kind: "discount", couponId: coupon50, durationMonths: 6 },
       ],
       {
         reporting: {
@@ -182,7 +182,7 @@ describe.skipIf(!hasStripeKey)("Subscription setup schedules (integration)", () 
     expect(typeof phase1End).toBe("number");
     expect(phase0End).toBe(addMonthsUnix(phase0Start as number, 3));
     expect(phase1Start).toBe(phase0End);
-    expect(phase1End).toBe(addMonthsUnix(phase1Start as number, 3));
+    expect(phase1End).toBe(addMonthsUnix(phase1Start as number, 6));
 
     expect(phases[0]?.trial_end).toBeNull();
     expect(phases[0]?.discounts?.[0]?.coupon).toBe(coupon90);
@@ -204,7 +204,7 @@ describe.skipIf(!hasStripeKey)("Subscription setup schedules (integration)", () 
       [
         { kind: "trial", durationMonths: 1 },
         { kind: "discount", couponId: coupon90, durationMonths: 2 },
-        { kind: "discount", couponId: coupon50, durationMonths: 3 },
+        { kind: "discount", couponId: coupon50, durationMonths: 6 },
       ],
       {
         reporting: {
@@ -242,7 +242,7 @@ describe.skipIf(!hasStripeKey)("Subscription setup schedules (integration)", () 
     expect(phase1Start).toBe(phase0End);
     expect(phase1End).toBe(addMonthsUnix(phase1Start as number, 2));
     expect(phase2Start).toBe(phase1End);
-    expect(phase2End).toBe(addMonthsUnix(phase2Start as number, 3));
+    expect(phase2End).toBe(addMonthsUnix(phase2Start as number, 6));
 
     expect(phases[0]?.trial_end).toBeTruthy();
     expect(phases[0]?.discounts).toHaveLength(0);

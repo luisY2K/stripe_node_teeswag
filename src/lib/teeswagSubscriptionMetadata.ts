@@ -19,7 +19,7 @@ export const TEESWAG_KEYS = {
   PRICING_MUTATION_AT: "teeswag_pricing_mutation_at",
   /** Where the mutation originated (script name, helper name, dashboard, ...). */
   PRICING_MUTATION_SOURCE: "teeswag_pricing_mutation_source",
-  /** Compact before/after coupon diff, e.g. `awesome-50-off-3m>awesome-70-off-3m`. */
+  /** Compact before/after coupon diff, e.g. `awesome-50-off-6m>awesome-70-off-6m`. */
   COUPON_BEFORE_AFTER: "teeswag_coupon_before_after",
   /** Customer-level: total ad-hoc promotions ever applied (integer string). */
   ADHOC_PROMOTION_COUNT: "teeswag_adhoc_promotion_count",

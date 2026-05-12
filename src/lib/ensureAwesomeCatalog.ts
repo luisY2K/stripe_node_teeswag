@@ -94,15 +94,15 @@ export async function ensureAwesomeCatalog(
   log(`Coupon:  ${coupon90.id} (${coupon90.percent_off}% off, 3 months)`);
 
   const coupon50 = await findOrCreateCoupon({
-    id: "awesome-50-off-3m",
+    id: "awesome-50-off-6m",
     name: "Awesome 50%",
     percent_off: 50,
     duration: "repeating",
-    duration_in_months: 3,
+    duration_in_months: 6,
     applies_to: { products: [product.id] },
     currency: "eur",
   });
-  log(`Coupon:  ${coupon50.id} (${coupon50.percent_off}% off, 3 months)`);
+  log(`Coupon:  ${coupon50.id} (${coupon50.percent_off}% off, 6 months)`);
 
   const coupon100 = await findOrCreateCoupon({
     id: "awesome-100-off-3m",
@@ -116,15 +116,15 @@ export async function ensureAwesomeCatalog(
   log(`Coupon:  ${coupon100.id} (${coupon100.percent_off}% off, 3 months)`);
 
   const coupon70 = await findOrCreateCoupon({
-    id: "awesome-70-off-3m",
+    id: "awesome-70-off-6m",
     name: "Awesome 70%",
     percent_off: 70,
     duration: "repeating",
-    duration_in_months: 3,
+    duration_in_months: 6,
     applies_to: { products: [product.id] },
     currency: "eur",
   });
-  log(`Coupon:  ${coupon70.id} (${coupon70.percent_off}% off, 3 months)`);
+  log(`Coupon:  ${coupon70.id} (${coupon70.percent_off}% off, 6 months)`);
 
   const ppvProduct = await findOrCreateProductById({
     id: PPV_PRODUCT_ID,

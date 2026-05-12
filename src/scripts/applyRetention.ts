@@ -9,9 +9,9 @@ import { bumpCustomerAdhocPromotion } from "../lib/adhocPromotion.js";
 const MUTATION_SOURCE_SCRIPT = "apply_retention_script";
 
 const COUPON_90 = "awesome-90-off-3m";
-const COUPON_50 = "awesome-50-off-3m";
+const COUPON_50 = "awesome-50-off-6m";
 const COUPON_100 = "awesome-100-off-3m";
-const COUPON_70 = "awesome-70-off-3m";
+const COUPON_70 = "awesome-70-off-6m";
 const PRODUCT_ID = "prod_awesome";
 
 const RETENTION_MAP: Record<string, string> = {
@@ -114,7 +114,7 @@ async function main(): Promise<void> {
       name: "Awesome 70%",
       percent_off: 70,
       duration: "repeating",
-      duration_in_months: 3,
+      duration_in_months: 6,
       applies_to: { products: [PRODUCT_ID] },
       currency: "eur",
     });

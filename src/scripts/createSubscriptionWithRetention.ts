@@ -12,7 +12,7 @@ import { syncInvoiceCadenceMetadataForSubscription } from "../lib/syncInvoiceCad
 import { applyAwesomeRetention } from "../lib/applyRetention.js";
 
 const COUPON_90 = "awesome-90-off-3m";
-const COUPON_50 = "awesome-50-off-3m";
+const COUPON_50 = "awesome-50-off-6m";
 const TEST_PM = "pm_card_visa";
 const RETENTION_MONTH = 4;
 const SOURCE = "create_subscription_retention";
@@ -69,7 +69,7 @@ async function main(): Promise<void> {
       },
       {
         items: [{ price: streamingPrice.id, quantity: 1 }],
-        duration: { interval: "month", interval_count: 3 },
+        duration: { interval: "month", interval_count: 6 },
         discounts: [{ coupon: COUPON_50 }],
         metadata: schedulePhaseMetadataForSubscription({
           source: SOURCE,

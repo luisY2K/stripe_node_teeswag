@@ -16,7 +16,7 @@ import {
 import { syncInvoiceCadenceMetadataForSubscription } from "../lib/syncInvoiceCadenceMetadata.js";
 
 const COUPON_90 = "awesome-90-off-3m";
-const COUPON_50 = "awesome-50-off-3m";
+const COUPON_50 = "awesome-50-off-6m";
 const TEST_PM = "pm_card_visa";
 const DAY = 86_400;
 const SOURCE = "create_subscription_trial";
@@ -85,7 +85,7 @@ async function main(): Promise<void> {
       },
       {
         items: [{ price: streamingPrice.id, quantity: 1 }],
-        duration: { interval: "month", interval_count: 3 },
+        duration: { interval: "month", interval_count: 6 },
         discounts: [{ coupon: COUPON_50 }],
         metadata: schedulePhaseMetadataForSubscription({
           source: SOURCE,
@@ -136,7 +136,7 @@ async function main(): Promise<void> {
   console.log(`Advanced:      ${months} month(s) (~${months * 30}d on clock)`);
   console.log(`Invoices tagged with cadence: ${cadenceInvoicesUpdated}`);
   console.log(
-    "Phases: 1mo trial -> 2mo 90% -> 3mo 50% -> release. Then apply:retention if needed.",
+    "Phases: 1mo trial -> 2mo 90% -> 6mo 50% -> release. Then apply:retention if needed.",
   );
 }
 
