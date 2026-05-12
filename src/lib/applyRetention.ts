@@ -196,8 +196,11 @@ export async function applyAwesomeRetention(
     },
   );
 
+  // Stripe rejects schedule updates that include phases whose end_date is in
+  // the past ("You can not update a phase that has already ended."). Past
+  // phases are preserved server-side, so we only send current + future phases.
   const updated = await stripe.subscriptionSchedules.update(schedule.id, {
-    phases,
+    phases: phases.slice(idx),
     proration_behavior: "none",
   });
 
