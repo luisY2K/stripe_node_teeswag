@@ -16,6 +16,7 @@
     "create:subscription:bundle-two-lines": "tsx --env-file=.env src/scripts/createBundleTwoLineSubscription.ts",
     "create:subscription:flexible-mixed-interval": "tsx --env-file=.env src/scripts/createFlexibleMixedIntervalSubscription.ts",
     "create:subscription:aligned-delivery-streaming": "tsx --env-file=.env src/scripts/createAlignedDeliveryAndStreamingPair.ts",
+    "create:subscription:retention": "tsx --env-file=.env src/scripts/createSubscriptionWithRetention.ts",
     "apply:retention": "tsx --env-file=.env src/scripts/applyRetention.ts",
     "dev": "tsx --env-file=.env src/scripts/example.ts",
     "script": "tsx --env-file=.env",
