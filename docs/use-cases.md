@@ -24,7 +24,7 @@ Each item below maps **intent → how to run or inspect it** in code.
 
 **Intent:** Ensure a repeatable Stripe catalog for demos (product, recurring price, coupons) without manual Dashboard clicks.
 
-**Implementation:** Idempotent setup creates the **Awesome** product (`prod_awesome`), a monthly **EUR** price with lookup key `awesome_monthly_eur`, percentage coupons used by schedules (including retention variants), plus a separate **PPV** product (`prod_awesome_ppv`), a **Billing meter** (`event_name` `ppv_view`, sum aggregation), and a **metered** price (`awesome_ppv_view_eur`, **EUR 2.99 per view** per monthly period).
+**Implementation:** Idempotent setup creates the **Awesome** product (`prod_awesome`), a monthly **EUR** price with lookup key `awesome_monthly_eur`, percentage coupons used by schedules (including retention variants), plus a separate **PPV** product (`prod_awesome_ppv`), a **Billing meter** (`event_name` `ppv_view`, sum aggregation), and a **metered** price (`awesome_ppv_view_eur`, **EUR 3 per view** per monthly period).
 
 | How to run              | Source                                                                                                                           |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------- |

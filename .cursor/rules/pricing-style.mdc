@@ -1,0 +1,39 @@
+---
+description: Prefer bold round price numbers over charm pricing
+alwaysApply: true
+---
+
+# Pricing style: bold round numbers
+
+When proposing or generating new prices, demo amounts, sample subscriptions,
+docs, or fixture data: prefer whole / round currency values. They are easier
+to digest at a glance and read better in tables, logs, and dashboards.
+
+Avoid charm pricing (`.99`, `.95`, `.49`) unless the user explicitly asks for
+it or a real-world product is being modelled.
+
+```typescript
+// BAD - charm pricing
+unitAmount: 299   // €2.99
+unitAmount: 1999  // €19.99
+unitAmount: 995   // €9.95
+
+// GOOD - bold round numbers
+unitAmount: 300   // €3
+unitAmount: 2000  // €20
+unitAmount: 1000  // €10
+```
+
+Same rule applies to docs / READMEs / log messages:
+
+```text
+BAD:  €2.99 per view, €19.99/month, $9.99 trial
+GOOD: €3 per view, €20/month, $10 trial
+```
+
+## Stripe-specific note
+
+Stripe `Price` objects are immutable on `unit_amount`. Changing this constant
+in code does not update an already-provisioned price. To migrate, either
+deactivate the old price and rotate the `lookup_key`, or accept the divergence
+for legacy environments.

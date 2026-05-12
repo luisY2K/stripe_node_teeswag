@@ -141,7 +141,7 @@ export async function ensureAwesomeCatalog(
   const ppvPrice = await findOrCreateMeteredPriceByLookupKey({
     lookupKey: PPV_PRICE_LOOKUP_KEY,
     product: ppvProduct.id,
-    unitAmount: 299,
+    unitAmount: 300,
     currency: "eur",
     interval: "month",
     meter: meter.id,
