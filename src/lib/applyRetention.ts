@@ -127,18 +127,52 @@ export async function applyAwesomeRetention(
 
   const phases: Stripe.SubscriptionScheduleUpdateParams.Phase[] = schedule.phases.map(
     (p, i) => {
-      const firstItem = p.items[0];
-      if (firstItem === undefined) {
+      if (p.items.length === 0) {
         throw new Error(`Phase on ${schedule.id} has no items`);
       }
-      const priceId =
-        typeof firstItem.price === "string" ? firstItem.price : firstItem.price.id;
+
+      const items: Stripe.SubscriptionScheduleUpdateParams.Phase.Item[] = p.items.map(
+        (it) => {
+          const priceId = typeof it.price === "string" ? it.price : it.price.id;
+          const item: Stripe.SubscriptionScheduleUpdateParams.Phase.Item = {
+            price: priceId,
+            quantity: it.quantity ?? 1,
+          };
+          if (
+            it.metadata !== undefined &&
+            it.metadata !== null &&
+            Object.keys(it.metadata).length > 0
+          ) {
+            item.metadata = it.metadata;
+          }
+          if (it.discounts !== undefined && it.discounts.length > 0) {
+            const mapped = it.discounts
+              .map((d) => {
+                const cid = resolveCouponId(d.coupon);
+                return cid !== undefined ? { coupon: cid } : null;
+              })
+              .filter((x): x is { coupon: string } => x !== null);
+            if (mapped.length > 0) {
+              item.discounts = mapped;
+            }
+          }
+          return item;
+        },
+      );
 
       const base: Stripe.SubscriptionScheduleUpdateParams.Phase = {
-        items: [{ price: priceId, quantity: firstItem.quantity ?? 1 }],
+        items,
         start_date: p.start_date,
         end_date: p.end_date,
       };
+
+      if (
+        p.metadata !== undefined &&
+        p.metadata !== null &&
+        Object.keys(p.metadata).length > 0
+      ) {
+        base.metadata = p.metadata;
+      }
 
       if (p.trial_end !== null) {
         base.trial_end = p.trial_end;
