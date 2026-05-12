@@ -1,14 +1,22 @@
+import { createClockedCustomer } from "../lib/clockedCustomer.js";
 import { dashboardSubscriptionUrl } from "../lib/dashboardUrl.js";
-import { createAwesomeSchedule } from "../lib/awesomeSchedule.js";
-import { createExistingDeliveryCustomer } from "../lib/createExistingDeliveryCustomer.js";
 import { ensureAwesomeCatalog } from "../lib/ensureAwesomeCatalog.js";
+import { getPriceByLookupKey } from "../lib/getPriceByLookupKey.js";
 import { parseMonthArg } from "../lib/parseMonthArg.js";
+import { LOOKUP_DELIVERY_MONTHLY_EUR } from "../lib/subscriptionCaseCatalog.js";
 import { stripe } from "../lib/stripe.js";
 import { syncInvoiceCadenceMetadataForSubscription } from "../lib/syncInvoiceCadenceMetadata.js";
 import { advanceTestClockByMonths } from "../lib/testClock.js";
+import {
+  directSubscriptionMetadata,
+  lineItemMetadata,
+  schedulePhaseMetadataForSubscription,
+  subscriptionScheduleObjectMetadata,
+} from "../lib/teeswagSubscriptionMetadata.js";
 
 const COUPON_90 = "awesome-90-off-3m";
 const COUPON_50 = "awesome-50-off-3m";
+const SOURCE = "aligned_delivery_streaming";
 
 async function main(): Promise<void> {
   const runStartedAt = Math.floor(Date.now() / 1000);
@@ -17,26 +25,82 @@ async function main(): Promise<void> {
   const argvMonths = parseMonthArg(process.argv.slice(2));
   const monthsElapsed = argvMonths > 0 ? argvMonths : 2;
 
-  const { clock, customer, deliverySub } = await createExistingDeliveryCustomer({
-    interval: "month",
-    monthsElapsed,
+  const deliveryPrice = await getPriceByLookupKey(LOOKUP_DELIVERY_MONTHLY_EUR);
+  const streamingPrice = await getPriceByLookupKey("awesome_monthly_eur");
+
+  // --- Existing delivery customer (monthly, advanced N months) ---
+  const { clock, customer, paymentMethodId } = await createClockedCustomer({
     clockNamePrefix: "case1-aligned",
-    teeswagSource: "aligned_delivery_streaming",
   });
 
-  const schedule = await createAwesomeSchedule(
-    customer.id,
-    [
-      { kind: "discount", couponId: COUPON_90, durationMonths: 3 },
-      { kind: "discount", couponId: COUPON_50, durationMonths: 3 },
-    ],
-    {
-      reporting: {
-        source: "aligned_delivery_streaming",
-        phaseTemplate: "90_50",
+  let deliverySub = await stripe.subscriptions.create({
+    customer: customer.id,
+    default_payment_method: paymentMethodId,
+    collection_method: "charge_automatically",
+    metadata: directSubscriptionMetadata({
+      source: SOURCE,
+      mix: "delivery_only",
+      phaseTemplate: "none",
+      hasTrial: false,
+      deliveryCadence: "month",
+    }),
+    items: [
+      {
+        price: deliveryPrice.id,
+        quantity: 1,
+        metadata: lineItemMetadata("delivery"),
       },
+    ],
+    expand: ["items"],
+  });
+
+  if (monthsElapsed > 0) {
+    await advanceTestClockByMonths(clock.id, monthsElapsed);
+  }
+
+  deliverySub = await stripe.subscriptions.retrieve(deliverySub.id, {
+    expand: ["items"],
+  });
+
+  // --- Streaming schedule (separate subscription, phased discounts) ---
+  const schedule = await stripe.subscriptionSchedules.create({
+    customer: customer.id,
+    start_date: "now",
+    end_behavior: "release",
+    metadata: subscriptionScheduleObjectMetadata(SOURCE),
+    default_settings: {
+      collection_method: "charge_automatically",
     },
-  );
+    phases: [
+      {
+        items: [{ price: streamingPrice.id, quantity: 1 }],
+        duration: { interval: "month", interval_count: 3 },
+        discounts: [{ coupon: COUPON_90 }],
+        metadata: schedulePhaseMetadataForSubscription({
+          source: SOURCE,
+          mix: "streaming_only",
+          phaseTemplate: "90_50",
+          hasTrialThisPhase: false,
+          streamCadence: "month",
+          couponSnapshot: COUPON_90,
+        }),
+      },
+      {
+        items: [{ price: streamingPrice.id, quantity: 1 }],
+        duration: { interval: "month", interval_count: 3 },
+        discounts: [{ coupon: COUPON_50 }],
+        metadata: schedulePhaseMetadataForSubscription({
+          source: SOURCE,
+          mix: "streaming_only",
+          phaseTemplate: "90_50",
+          hasTrialThisPhase: false,
+          streamCadence: "month",
+          couponSnapshot: COUPON_50,
+        }),
+      },
+    ],
+    expand: ["subscription"],
+  });
 
   await advanceTestClockByMonths(clock.id, 2);
 

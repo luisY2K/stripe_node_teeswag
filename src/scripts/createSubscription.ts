@@ -1,7 +1,7 @@
 import { dashboardSubscriptionUrl } from "../lib/dashboardUrl.js";
-import { createAwesomeSchedule } from "../lib/awesomeSchedule.js";
 import { ensureAwesomeCatalog } from "../lib/ensureAwesomeCatalog.js";
 import { makeFakeCustomer } from "../lib/fakeCustomer.js";
+import { getPriceByLookupKey } from "../lib/getPriceByLookupKey.js";
 import { parseMonthArg } from "../lib/parseMonthArg.js";
 import {
   advanceTestClock,
@@ -9,12 +9,17 @@ import {
   waitTestClockReady,
 } from "../lib/testClock.js";
 import { stripe } from "../lib/stripe.js";
+import {
+  schedulePhaseMetadataForSubscription,
+  subscriptionScheduleObjectMetadata,
+} from "../lib/teeswagSubscriptionMetadata.js";
 import { syncInvoiceCadenceMetadataForSubscription } from "../lib/syncInvoiceCadenceMetadata.js";
 
 const COUPON_90 = "awesome-90-off-3m";
 const COUPON_50 = "awesome-50-off-3m";
 const TEST_PM = "pm_card_visa";
 const DAY = 86_400;
+const SOURCE = "create_subscription";
 
 async function main(): Promise<void> {
   const runStartedAt = Math.floor(Date.now() / 1000);
@@ -42,19 +47,46 @@ async function main(): Promise<void> {
     invoice_settings: { default_payment_method: attachedPm.id },
   });
 
-  const schedule = await createAwesomeSchedule(
-    customer.id,
-    [
-      { kind: "discount", couponId: COUPON_90, durationMonths: 3 },
-      { kind: "discount", couponId: COUPON_50, durationMonths: 3 },
-    ],
-    {
-      reporting: {
-        source: "create_subscription",
-        phaseTemplate: "90_50",
-      },
+  const streamingPrice = await getPriceByLookupKey("awesome_monthly_eur");
+
+  const schedule = await stripe.subscriptionSchedules.create({
+    customer: customer.id,
+    start_date: "now",
+    end_behavior: "release",
+    metadata: subscriptionScheduleObjectMetadata(SOURCE),
+    default_settings: {
+      collection_method: "charge_automatically",
     },
-  );
+    phases: [
+      {
+        items: [{ price: streamingPrice.id, quantity: 1 }],
+        duration: { interval: "month", interval_count: 3 },
+        discounts: [{ coupon: COUPON_90 }],
+        metadata: schedulePhaseMetadataForSubscription({
+          source: SOURCE,
+          mix: "streaming_only",
+          phaseTemplate: "90_50",
+          hasTrialThisPhase: false,
+          streamCadence: "month",
+          couponSnapshot: COUPON_90,
+        }),
+      },
+      {
+        items: [{ price: streamingPrice.id, quantity: 1 }],
+        duration: { interval: "month", interval_count: 3 },
+        discounts: [{ coupon: COUPON_50 }],
+        metadata: schedulePhaseMetadataForSubscription({
+          source: SOURCE,
+          mix: "streaming_only",
+          phaseTemplate: "90_50",
+          hasTrialThisPhase: false,
+          streamCadence: "month",
+          couponSnapshot: COUPON_50,
+        }),
+      },
+    ],
+    expand: ["subscription"],
+  });
 
   if (months > 0) {
     const beforeClock = await stripe.testHelpers.testClocks.retrieve(clock.id);
