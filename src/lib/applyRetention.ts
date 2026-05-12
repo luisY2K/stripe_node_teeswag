@@ -1,6 +1,10 @@
 import type Stripe from "stripe";
 import { stripe } from "./stripe.js";
 import { findOrCreateCoupon } from "./stripeIdempotent.js";
+import { pricingMutationMetadata } from "./teeswagSubscriptionMetadata.js";
+import { bumpCustomerAdhocPromotion } from "./adhocPromotion.js";
+
+const MUTATION_SOURCE_LIB = "apply_retention_lib";
 
 const COUPON_90 = "awesome-90-off-3m";
 const COUPON_50 = "awesome-50-off-3m";
@@ -68,7 +72,14 @@ function firstCouponFromPhase(
 
 export async function applyAwesomeRetention(
   subscriptionId: string,
-): Promise<{ scheduleId: string; appliedCouponId: string }> {
+  options: { mutationSource?: string } = {},
+): Promise<{
+  scheduleId: string;
+  appliedCouponId: string;
+  customerAdhocCount: number;
+}> {
+  const mutationSource = options.mutationSource ?? MUTATION_SOURCE_LIB;
+
   const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
     expand: ["schedule"],
   });
@@ -125,6 +136,13 @@ export async function applyAwesomeRetention(
 
   await ensureRetentionCouponExists(replacementCouponId);
 
+  const mutationTags = pricingMutationMetadata({
+    mutation: "retention_coupon_swap",
+    source: mutationSource,
+    couponBefore: existingCouponId,
+    couponAfter: replacementCouponId,
+  });
+
   const phases: Stripe.SubscriptionScheduleUpdateParams.Phase[] = schedule.phases.map(
     (p, i) => {
       if (p.items.length === 0) {
@@ -166,12 +184,13 @@ export async function applyAwesomeRetention(
         end_date: p.end_date,
       };
 
-      if (
-        p.metadata !== undefined &&
-        p.metadata !== null &&
-        Object.keys(p.metadata).length > 0
-      ) {
-        base.metadata = p.metadata;
+      const existingMetadata =
+        p.metadata !== undefined && p.metadata !== null ? p.metadata : {};
+
+      if (i === idx) {
+        base.metadata = { ...existingMetadata, ...mutationTags };
+      } else if (Object.keys(existingMetadata).length > 0) {
+        base.metadata = existingMetadata;
       }
 
       if (p.trial_end !== null) {
@@ -204,5 +223,24 @@ export async function applyAwesomeRetention(
     proration_behavior: "none",
   });
 
-  return { scheduleId: updated.id, appliedCouponId: replacementCouponId };
+  // Mirror the mutation tags onto the schedule object itself so the audit
+  // trail survives phase transitions and schedule release.
+  await stripe.subscriptionSchedules.update(updated.id, {
+    metadata: { ...(updated.metadata ?? {}), ...mutationTags },
+  });
+
+  const customerId =
+    typeof subscription.customer === "string"
+      ? subscription.customer
+      : subscription.customer.id;
+  const { count: customerAdhocCount } = await bumpCustomerAdhocPromotion(
+    customerId,
+    "retention_coupon_swap",
+  );
+
+  return {
+    scheduleId: updated.id,
+    appliedCouponId: replacementCouponId,
+    customerAdhocCount,
+  };
 }

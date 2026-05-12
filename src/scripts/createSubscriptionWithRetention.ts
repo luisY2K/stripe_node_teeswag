@@ -108,7 +108,8 @@ async function main(): Promise<void> {
     );
   }
 
-  const { scheduleId, appliedCouponId } = await applyAwesomeRetention(subId);
+  const { scheduleId, appliedCouponId, customerAdhocCount } =
+    await applyAwesomeRetention(subId);
 
   let cadenceInvoicesUpdated = 0;
   cadenceInvoicesUpdated = await syncInvoiceCadenceMetadataForSubscription({
@@ -126,6 +127,7 @@ async function main(): Promise<void> {
     `Advanced:      ${RETENTION_MONTH} month(s) (~${RETENTION_MONTH * 30}d on clock)`,
   );
   console.log(`Retention:     coupon swapped to ${appliedCouponId}`);
+  console.log(`Customer ad-hoc count: ${customerAdhocCount}`);
   console.log(`Invoices tagged with cadence: ${cadenceInvoicesUpdated}`);
 }
 

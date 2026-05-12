@@ -3,6 +3,10 @@ import { dashboardSubscriptionUrl } from "../lib/dashboardUrl.js";
 import { ensureAwesomeCatalog } from "../lib/ensureAwesomeCatalog.js";
 import { findOrCreateCoupon } from "../lib/stripeIdempotent.js";
 import { stripe } from "../lib/stripe.js";
+import { pricingMutationMetadata } from "../lib/teeswagSubscriptionMetadata.js";
+import { bumpCustomerAdhocPromotion } from "../lib/adhocPromotion.js";
+
+const MUTATION_SOURCE_SCRIPT = "apply_retention_script";
 
 const COUPON_90 = "awesome-90-off-3m";
 const COUPON_50 = "awesome-50-off-3m";
@@ -118,6 +122,13 @@ async function main(): Promise<void> {
     throw new Error(`Unsupported retention coupon id: ${replacementCouponId}`);
   }
 
+  const mutationTags = pricingMutationMetadata({
+    mutation: "retention_coupon_swap",
+    source: MUTATION_SOURCE_SCRIPT,
+    couponBefore: existingCouponId,
+    couponAfter: replacementCouponId,
+  });
+
   // --- Rebuild all phases, swapping the coupon on the current phase ---
   const phases: Stripe.SubscriptionScheduleUpdateParams.Phase[] = schedule.phases.map(
     (p, i) => {
@@ -160,12 +171,13 @@ async function main(): Promise<void> {
         end_date: p.end_date,
       };
 
-      if (
-        p.metadata !== undefined &&
-        p.metadata !== null &&
-        Object.keys(p.metadata).length > 0
-      ) {
-        base.metadata = p.metadata;
+      const existingMetadata =
+        p.metadata !== undefined && p.metadata !== null ? p.metadata : {};
+
+      if (i === idx) {
+        base.metadata = { ...existingMetadata, ...mutationTags };
+      } else if (Object.keys(existingMetadata).length > 0) {
+        base.metadata = existingMetadata;
       }
 
       if (p.trial_end !== null) {
@@ -198,10 +210,24 @@ async function main(): Promise<void> {
     proration_behavior: "none",
   });
 
-  console.log(`Schedule:        ${updated.id}`);
-  console.log(`Applied coupon:  ${replacementCouponId}`);
-  console.log(`Swapped from:    ${existingCouponId} → ${replacementCouponId}`);
-  console.log(`Dashboard:       ${dashboardSubscriptionUrl(subscriptionId)}`);
+  await stripe.subscriptionSchedules.update(updated.id, {
+    metadata: { ...(updated.metadata ?? {}), ...mutationTags },
+  });
+
+  const customerId =
+    typeof subscription.customer === "string"
+      ? subscription.customer
+      : subscription.customer.id;
+  const { count: customerAdhocCount } = await bumpCustomerAdhocPromotion(
+    customerId,
+    "retention_coupon_swap",
+  );
+
+  console.log(`Schedule:           ${updated.id}`);
+  console.log(`Applied coupon:     ${replacementCouponId}`);
+  console.log(`Swapped from:       ${existingCouponId} → ${replacementCouponId}`);
+  console.log(`Customer ad-hoc:    ${customerAdhocCount}`);
+  console.log(`Dashboard:          ${dashboardSubscriptionUrl(subscriptionId)}`);
 }
 
 main().catch((err: unknown) => {
