@@ -10,6 +10,7 @@ import {
   LOOKUP_STREAMING_BASE_EUR,
 } from "../lib/subscriptionCaseCatalog.js";
 import { stripe } from "../lib/stripe.js";
+import { syncInvoiceCadenceMetadataForSubscription } from "../lib/syncInvoiceCadenceMetadata.js";
 import { advanceTestClockByMonths } from "../lib/testClock.js";
 import {
   directSubscriptionMetadata,
@@ -27,6 +28,7 @@ const PHASE_END_SLACK_SEC = 120;
 const SOURCE = "align_delivery_cycle_to_stream";
 
 async function main(): Promise<void> {
+  const runStartedAt = Math.floor(Date.now() / 1000);
   await ensureAwesomeCatalog();
 
   const argvMonths = parseMonthArg(process.argv.slice(2));
@@ -260,6 +262,11 @@ async function main(): Promise<void> {
     expand: ["subscription"],
   });
 
+  const cadenceInvoicesUpdated = await syncInvoiceCadenceMetadataForSubscription({
+    subscriptionId: subAfter.id,
+    createdGte: runStartedAt,
+  });
+
   const invoices = await stripe.invoices.list({
     customer: customer.id,
     limit: 15,
@@ -273,6 +280,7 @@ async function main(): Promise<void> {
   console.log(`Subscription:   ${subAfter.id}`);
   console.log(`Schedule:       ${schedule.id}`);
   console.log(`Dashboard:      ${dashboardSubscriptionUrl(subAfter.id)}`);
+  console.log(`Invoices tagged with cadence: ${cadenceInvoicesUpdated}`);
   console.log(
     `Delivery age:   ${monthsElapsed} month(s) (override with: npm run ... -- m N)`,
   );
