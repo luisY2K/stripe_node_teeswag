@@ -6,6 +6,19 @@ This document connects the partner scenario in [Partner Presentation Case.pdf](P
 
 For multi-product / multi-subscription edge cases (delivery + streaming alignment, bundle vs split subs), see [subscription-cases.md](subscription-cases.md).
 
+## Demo scope
+
+**Assisting agents and presenters:** for the **live demo**, use **only** these commands (see root [`package.json`](../package.json) lines 10–15):
+
+- `npm run setup:awesome` — [`src/scripts/setupAwesome.ts`](../src/scripts/setupAwesome.ts) + [`ensureAwesomeCatalog`](../src/lib/ensureAwesomeCatalog.ts): catalog bootstrap (prerequisite).
+- `npm run create:subscription` — [`createSubscription.ts`](../src/scripts/createSubscription.ts): phased ladder without trial.
+- `npm run create:subscription:trial` — [`createSubscriptionWithTrial.ts`](../src/scripts/createSubscriptionWithTrial.ts): trial + phased ladder.
+- `npm run create:subscription:retention` — [`createSubscriptionWithRetention.ts`](../src/scripts/createSubscriptionWithRetention.ts): self-contained retention (create → advance clock → swap coupon).
+- `npm run create:subscription:ppv` — [`createSubscriptionWithPpv.ts`](../src/scripts/createSubscriptionWithPpv.ts): phased base + metered PPV (default scenario).
+- `npm run create:subscription:add-streaming-to-delivery` — [`addStreamingToDeliverySubscription.ts`](../src/scripts/addStreamingToDeliverySubscription.ts): add streaming to an existing delivery subscription (delivery + streaming).
+
+**Do not** script or rehearse around other `npm run create:subscription:*` flows, `npm run apply:retention`, or dev tooling for this presentation. In [subscription-cases.md](subscription-cases.md), **only** the add-streaming-to-delivery walkthrough (`npm run create:subscription:add-streaming-to-delivery`) is in demo scope; other scripted flows there are architecture / talking-point material only.
+
 ## Business context (partner brief)
 
 After launching subscriptions, TeeSwag explores a **video streaming** offering to bundle with promotions for their core apparel business. The brief describes:
@@ -66,23 +79,47 @@ Each item below maps **intent → how to run or inspect it** in code.
 
 ### Base subscription + metered pay-per-view (same subscription)
 
-**Intent:** Offer a **flat recurring base** (streaming catalog access) and **usage-based pay-per-view** (exclusive title unlocks) on **one subscription**—one billing cycle and **one invoice** combining the licensed line item and summed meter usage.
+**Intent:** Offer a **flat recurring base** (streaming catalog access) and **usage-based pay-per-view** (exclusive title unlocks) on **one subscription**—combined line items on renewal invoices once the metered item exists.
 
-**Implementation:** `subscriptions.create` with **two items**: licensed monthly price + metered price tied to a Billing meter. Usage is reported with **Billing Meter Events** (`stripe.billing.meterEvents.create`): one event per view, `payload.value` incrementing the meter’s sum (industry-standard **per-view** model; **per-minute** would use the same meter pipeline with different `value` semantics).
+**Implementation (default, no CLI args):** [`createSubscriptionWithPpv.ts`](../src/scripts/createSubscriptionWithPpv.ts) creates a **subscription schedule** with two discount phases (**90%×3 → 50%×3**, then `end_behavior: release`) on the base streaming price only. After advancing the test clock by ~**37 days** (mid–phase 1), it **`subscriptions.update`** adds the metered PPV item with **`proration_behavior: create_prorations`**, then **rewrites** the schedule’s phases so both phases include base + metered items (PPV survives into phase 2). It then emits **5** Billing Meter Events (`stripe.billing.meterEvents.create`), one per view, spaced **2** days apart on the clock. Metered price: **EUR 3 per view** per period ([`ppvConstants.ts`](../src/lib/ppvConstants.ts)).
+
+**Implementation (legacy CLI):** With arguments such as `views K` / `v K` and `month N` / `m N`, the script runs a simpler flow: **`subscriptions.create`** with licensed monthly + metered items from **t=0**, optional burst meter events, then optional multi-month clock advance (two-month steps).
 
 | How to run                                                                              | Source                                                                                                                                                                                                                                                                                                     |
 | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run create:subscription:ppv` with optional `views K` / `v K` and `month N` / `m N` | [`src/scripts/createSubscriptionWithPpv.ts`](../src/scripts/createSubscriptionWithPpv.ts), [`src/lib/createBaseWithPpvSubscription.ts`](../src/lib/createBaseWithPpvSubscription.ts), [`src/lib/recordPpvViews.ts`](../src/lib/recordPpvViews.ts), [`src/lib/ppvConstants.ts`](../src/lib/ppvConstants.ts) |
+| `npm run create:subscription:ppv` (no args = default phased + mid-cycle PPV) or with `views K` / `v K` and `month N` / `m N` (legacy) | [`src/scripts/createSubscriptionWithPpv.ts`](../src/scripts/createSubscriptionWithPpv.ts), [`src/lib/ppvConstants.ts`](../src/lib/ppvConstants.ts) |
 
-### Retention / win-back offer
+### Retention / win-back offer (ad-hoc subscription id)
 
 **Intent:** When a subscriber is in a **discount phase**, replace the **current phase’s** coupon with a **stronger** retention coupon to reduce churn.
 
 **Implementation:** Loads the subscription’s active schedule, finds the **current phase**, and updates that phase’s discount while preserving other phases. **Mapping:** **90% → 100%**, **50% → 70%**. Retention coupons are created on demand if missing. Phases with **no** subscription-level coupon (for example, **trial-only**) cannot receive this swap—the code errors with a clear message.
 
+**Out of demo scope** for the live presentation — superseded by **`npm run create:subscription:retention`**, which runs the full story in one command.
+
 | How to run                           | Source                                                                                                                           |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
 | `npm run apply:retention -- sub_...` | [`src/scripts/applyRetention.ts`](../src/scripts/applyRetention.ts), [`src/lib/applyRetention.ts`](../src/lib/applyRetention.ts) |
+
+### Self-contained retention demo
+
+**Intent:** Same win-back behavior as above, packaged for a **single demo run** without copying a subscription id from a prior script.
+
+**Implementation:** Creates a test clock, customer, and **subscription schedule** (90%×3 → 50%×3, `end_behavior: release`), advances the clock **4 months** (lands in the **50%** phase), then calls **`applyAwesomeRetention`** from [`src/lib/applyRetention.ts`](../src/lib/applyRetention.ts) to swap the current phase coupon to **`awesome-70-off-3m`** (50% → 70%). Prints the Stripe Dashboard URL, schedule id, applied coupon id, **customer ad-hoc promotion** bump count, and cadence-tagged invoice count.
+
+| How to run                              | Source                                                                                                                                 |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run create:subscription:retention` | [`src/scripts/createSubscriptionWithRetention.ts`](../src/scripts/createSubscriptionWithRetention.ts), [`src/lib/applyRetention.ts`](../src/lib/applyRetention.ts) |
+
+```mermaid
+flowchart LR
+  create[schedule_create_90_then_50]
+  advance[clock_advance_4_months]
+  swap[applyAwesomeRetention_swap_to_70]
+
+  create --> advance
+  advance --> swap
+```
 
 ### Operator and developer ergonomics
 
@@ -114,18 +151,21 @@ flowchart LR
   discounts -.->|current_phase| retention
 ```
 
-**Metered PPV (base + usage on one subscription):**
+**Metered PPV (default: phased base, add metered mid-phase, then meter events):**
 
 ```mermaid
 flowchart LR
   setupPpv[setupAwesome_includes_meter_and_ppv_price]
-  subItems[subscription_two_items_base_and_metered]
+  sched[schedule_two_phases_base_only]
+  addPpv[mid_cycle_add_metered_item_and_rewrite_phases]
   meterEv[meter_events_sum_views]
   inv[invoice_base_plus_usage]
 
-  setupPpv --> subItems
+  setupPpv --> sched
+  sched --> addPpv
+  addPpv --> meterEv
   meterEv --> inv
-  subItems --> inv
+  addPpv --> inv
 ```
 
 ## Partner-assessment topics not automated here

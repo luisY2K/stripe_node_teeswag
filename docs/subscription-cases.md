@@ -2,6 +2,10 @@
 
 This document catalogs realistic Stripe Billing shapes when **premium delivery** (`subscription_a` on `prod_a`) coexists with **streaming** (new subscription or new items). It complements [use-cases.md](use-cases.md), which describes what this repo’s scripts implement today.
 
+## Demo scope
+
+For the **live TeeSwag demo**, the only scripted multi-product flow in scope is **`npm run create:subscription:add-streaming-to-delivery`** ([`addStreamingToDeliverySubscription.ts`](../src/scripts/addStreamingToDeliverySubscription.ts); see root [`package.json`](../package.json)), which adds streaming to an existing delivery subscription. Cases 1, 4, 5, and 7 (and scripted flows for them) are **out of demo scope**: keep them as **architecture and partner-conversation** material; do **not** rehearse or present those `npm run` paths during the demo. Conceptual Cases 2, 3, and 8 have no dedicated demo script here — same rule: talking points only.
+
 Official references:
 
 - [Set the subscription billing renewal date](https://docs.stripe.com/billing/subscriptions/billing-cycle) (billing cycle anchor, proration, realignment).
@@ -154,7 +158,7 @@ Same mechanics as **Case 1**, framed as cross-product: `prod_a` vs `prod_b`. Ali
 
 **Run it:** `npm run create:subscription:flexible-mixed-interval`
 
-**Demo script.** Starts from **yearly flexible Awesome Delivery** (~**2 months** elapsed by default; `m N`). Cancels with **`prorate`** + **`invoice_now`** (credit for unused months). Creates a new **`billing_mode: flexible`** subscription with **yearly** delivery + **monthly** Awesome Stream — **no preserved `billing_cycle_anchor`** (defaults to **now**, avoiding a **€24-style first invoice**). Migrates to a **`subscription_schedule`** with phased **90% → 50%** on the streaming item only (same helper as Case 6). **Cadence on streaming renewals:** **€12 × 3**, **€20 × 3**, **€30**…. Optional **`free-trial`** (`npm run … -- free-trial`): **€10**, then **€12 × 2**, **€20 × 3**, **€30**…. **`npm run apply:retention`** does not swap these item-level phased coupons.
+**Demo script.** Starts from **yearly flexible Awesome Delivery** (~**2 months** elapsed by default; `m N`). Cancels with **`prorate`** + **`invoice_now`** (credit for unused months). Creates a new **`billing_mode: flexible`** subscription with **yearly** delivery + **monthly** Awesome Stream — **no preserved `billing_cycle_anchor`** (defaults to **now**, avoiding a **€24-style first invoice**). Migrates to a **`subscription_schedule`** with phased **90% → 50%** on the streaming item only (same helper as add-streaming-to-delivery). **Cadence on streaming renewals:** **€12 × 3**, **€20 × 3**, **€30**…. Optional **`free-trial`** (`npm run … -- free-trial`): **€10**, then **€12 × 2**, **€20 × 3**, **€30**…. **`npm run apply:retention`** does not swap these item-level phased coupons.
 
 **Setup.** One subscription with item 1 → `price_a` on `prod_a`, item 2 → `price_b` on `prod_b`. If **`price_a`** is yearly and **`price_b`** monthly (and metered PPV monthly), you need [**mixed interval subscriptions**](https://docs.stripe.com/billing/subscriptions/mixed-interval):
 
@@ -174,7 +178,7 @@ Same mechanics as **Case 1**, framed as cross-product: `prod_a` vs `prod_b`. Ali
 
 ---
 
-### Case 6 — Add streaming to **existing** `subscription_a` (`subscriptions.update` + schedule)
+### Add streaming to **existing** `subscription_a` (`subscriptions.update` + schedule)
 
 **Run it:** `npm run create:subscription:add-streaming-to-delivery`
 
@@ -239,7 +243,7 @@ Use **`billing_mode[type]=flexible`** when delivery and streaming intervals diff
 
 **Cons.** Delivery renewal cadence changes for the customer; finance must handle yearly-to-monthly crediting and revised revenue shape.
 
-**Gotchas.** Not for customers who must keep yearly delivery cadence. If yearly cadence must remain, use Case 5/Case 6 style approaches instead.
+**Gotchas.** Not for customers who must keep yearly delivery cadence. If yearly cadence must remain, use Case 5 or add-streaming-to-delivery style approaches instead.
 
 ---
 
@@ -300,7 +304,7 @@ flowchart TD
   case5["Case 5 flexible mixed-interval one sub"]
   case1["Case 1 two subs aligned anchor"]
   case3b["Case 3b two subs different cadence"]
-  case6["Case 6 update existing sub add items"]
+  addStreamToDelivery["Add streaming update existing sub add items"]
 
   needOneInvoice -->|yes| sameCadence
   needOneInvoice -->|no| needSeparateCancel
@@ -308,7 +312,7 @@ flowchart TD
   sameCadence -->|no| case5
   needSeparateCancel -->|yes| case3b
   needSeparateCancel -->|no| case1
-  needSeparateCancel -->|fold into existing sub| case6
+  needSeparateCancel -->|fold into existing sub| addStreamToDelivery
 ```
 
 ---
@@ -319,7 +323,7 @@ flowchart TD
 | --------------------------------------------- | ------------------------------------------------------------------ |
 | Simplest **single invoice** per renewal       | **Case 4** (bundle product) or **Case 5** (two products, flexible) |
 | **Same renewal day**, separate subscriptions  | **Case 1** (aligned `billing_cycle_anchor_config`)                 |
-| **Fold streaming into existing delivery sub** | **Case 6** (+ flexible if intervals differ)                        |
+| **Fold streaming into existing delivery sub** | **Add streaming to delivery** (+ flexible if intervals differ)     |
 | **Independent yearly + monthly** billing      | **Case 3b** (accept two invoice streams)                           |
 | Avoid accidental chaos                        | Avoid **Case 7**                                                   |
 
@@ -327,4 +331,4 @@ flowchart TD
 
 ## Relation to this repository
 
-Today’s scripts (`create:subscription`, `create:subscription:ppv`, etc.) implement **single-customer, single-subscription** demos with [`ensureAwesomeCatalog`](../src/lib/ensureAwesomeCatalog.ts). **`npm run create:subscription:add-streaming-to-delivery`**, **`npm run create:subscription:bundle-two-lines`**, **`npm run create:subscription:flexible-mixed-interval`**, and **`npm run create:subscription:aligned-delivery-streaming`** provision catalog objects and walk through Cases 6, 4, 5, and 1 respectively in test mode (that is also the order they are listed in `package.json`). This document still frames **architecture and partner conversations** for all eight cases; extend scripts further only after choosing a case and Stripe prerequisites (API version, flexible billing, metered prices).
+Scripts under [`ensureAwesomeCatalog`](../src/lib/ensureAwesomeCatalog.ts) back the Awesome Delivery / Stream / PPV catalog. **For the live demo**, presenters and assisting agents should focus only on **`npm run create:subscription:add-streaming-to-delivery`** (add streaming to existing delivery). Cases 1, 4, 5, and 7 still have runnable scripts in the repo for engineering exploration, but they are **explicitly out of demo scope** (see [Demo scope](#demo-scope) above). This document still frames **architecture and partner conversations** for all eight cases; extend scripts further only after choosing a case and Stripe prerequisites (API version, flexible billing, metered prices).

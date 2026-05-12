@@ -64,7 +64,7 @@ async function main(): Promise<void> {
   const { name, email } = makeFakeCustomer();
   const clock = await stripe.testHelpers.testClocks.create({
     frozen_time: nowSec,
-    name: `case6-add-stream-${nowSec}`,
+    name: `add-stream-to-delivery-${nowSec}`,
   });
   const customer = await stripe.customers.create({
     name,
@@ -380,8 +380,8 @@ async function main(): Promise<void> {
 
   console.log(
     freeTrial
-      ? "Case 6 consolidated (free-trial): delivery charged throughout; streaming €0 for bridge + 1mo, then 90%×2, 50%×3, tail 1mo."
-      : "Case 6 consolidated: bridge monthly streaming + 90% coupon, then 90%×3, 50%×3, tail 1mo.",
+      ? "Add-streaming-to-delivery consolidated (free-trial): delivery charged throughout; streaming €0 for bridge + 1mo, then 90%×2, 50%×3, tail 1mo."
+      : "Add-streaming-to-delivery consolidated: bridge monthly streaming + 90% coupon, then 90%×3, 50%×3, tail 1mo.",
   );
   console.log(`Test clock:     ${clock.id}`);
   console.log(`Customer:       ${customer.id}`);

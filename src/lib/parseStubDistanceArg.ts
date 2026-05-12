@@ -6,7 +6,7 @@ export type StubDistance = "long" | "short";
  * - `stub=long` / `stub=short`
  * - `--stub-long` / `--stub-short`
  *
- * Case 6 and the stub-promo spike default to `"short"` (~7d) when omitted — see those scripts.
+ * Add-streaming-to-delivery and the stub-promo spike default to `"short"` (~7d) when omitted — see those scripts.
  */
 export function parseStubDistanceArg(
   argv: readonly string[],
