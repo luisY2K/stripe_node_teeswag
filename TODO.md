@@ -2,6 +2,8 @@
 
 Issues identified during the readability refactor (PR #2). These are separate from the inlining work and should be fixed independently.
 
+**Reference script:** `addStreamingToDeliverySubscription.ts` (`create:subscription:add-streaming-to-delivery`) — this script already has the most complete and correct implementation. Use it as the baseline for metadata patterns when fixing the issues below.
+
 ## 1. Missing `lineItemMetadata()` on subscription schedule items
 
 Schedule phases create items without `teeswag_line_type` metadata:
