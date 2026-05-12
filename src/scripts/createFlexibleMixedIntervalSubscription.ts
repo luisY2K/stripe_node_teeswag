@@ -181,6 +181,11 @@ async function main(): Promise<void> {
 
   const phases: Stripe.SubscriptionScheduleUpdateParams.Phase[] = [];
 
+  // Stripe requires phases[0].start_date to equal the current phase's start_date
+  // (`phaseStart`). When the gap to `defaultStart` is meaningful, insert a bridge
+  // phase from phaseStart→defaultStart. Otherwise anchor the first promo phase
+  // at phaseStart so the invariant always holds.
+  let firstPromoStart = promoStart;
   if (phaseStart < defaultStart - PHASE_MERGE_EPS_SEC) {
     phases.push({
       start_date: phaseStart,
@@ -196,9 +201,11 @@ async function main(): Promise<void> {
       }),
       items: itemsWithCoupon(),
     });
+  } else {
+    firstPromoStart = phaseStart;
   }
 
-  let cursor = promoStart;
+  let cursor = firstPromoStart;
   for (const phase of promoPhases) {
     const segEnd = cursor + phase.durationMonths * MONTH_SEC;
     phases.push({
