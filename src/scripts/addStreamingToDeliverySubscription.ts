@@ -26,13 +26,11 @@ import {
   schedulePhaseMetadataForSubscription,
   subscriptionScheduleObjectMetadata,
 } from "../lib/teeswagSubscriptionMetadata.js";
-import { addMonthsUnix } from "../lib/addMonthsUnix.js";
 
 const SOURCE = "add_streaming_to_delivery";
 const COUPON_90 = "awesome-90-off-3m";
 const COUPON_50 = "awesome-50-off-6m";
 const DAY = 86_400;
-const MONTH_SEC = 30 * DAY;
 const PHASE_MERGE_EPS_SEC = 120;
 const PHASE_TEMPLATE = "combined_stubfree_trial1_90_50";
 const COUPON_SNAPSHOT = `free_streaming,${COUPON_90},${COUPON_50}`;
@@ -168,18 +166,6 @@ async function main(): Promise<void> {
     );
   }
 
-  const itemsList: Stripe.SubscriptionScheduleUpdateParams.Phase.Item[] = [
-    {
-      price: monthlyDelivery.id,
-      quantity: 1,
-      metadata: lineItemMetadata("delivery"),
-    },
-    {
-      price: monthlyStreaming.id,
-      quantity: 1,
-      metadata: lineItemMetadata("streaming"),
-    },
-  ];
   const items90: Stripe.SubscriptionScheduleUpdateParams.Phase.Item[] = [
     {
       price: monthlyDelivery.id,
@@ -230,9 +216,13 @@ async function main(): Promise<void> {
     streamCadence: "month",
   });
 
-  // Drop the stub bridge phase when the gap between the schedule start and the
-  // streaming anchor collapses to under ~2 minutes; Stripe rejects (and we don't
-  // want) effectively zero-length phases, so we fold them into the trial month.
+  // When streaming was added mid-cycle (the normal case), this bridge phase
+  // consumes the already-elapsed portion of the in-flight delivery cycle and
+  // pushes the cursor forward to promoStart, so the 1-month free-trial phase
+  // below anchors on the next billing boundary (where the next invoice lands).
+  // The guard skips it only in the degenerate case where phaseStart and
+  // promoStart are already at the same boundary - no elapsed time to bridge,
+  // and Stripe would reject a near-zero-length phase anyway.
   if (phaseStart < promoStart - PHASE_MERGE_EPS_SEC) {
     phases.push({
       items: itemsStub,
@@ -247,7 +237,7 @@ async function main(): Promise<void> {
 
   phases.push({
     items: itemsStub,
-    start_date: cursor,
+    start_date: promoStart,
     duration: { interval: "month", interval_count: 1 },
     metadata: schedulePhaseMetadataForSubscription({
       ...metadataBase,

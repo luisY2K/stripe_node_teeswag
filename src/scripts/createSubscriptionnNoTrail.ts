@@ -3,11 +3,7 @@ import { ensureAwesomeCatalog } from "../lib/ensureAwesomeCatalog.js";
 import { makeFakeCustomer } from "../lib/fakeCustomer.js";
 import { getPriceByLookupKey } from "../lib/getPriceByLookupKey.js";
 import { parseMonthArg } from "../lib/parseMonthArg.js";
-import {
-  advanceTestClock,
-  createTestClock,
-  waitTestClockReady,
-} from "../lib/testClock.js";
+import { advanceTestClockByMonths, createTestClock } from "../lib/testClock.js";
 import { stripe } from "../lib/stripe.js";
 import {
   schedulePhaseMetadataForSubscription,
@@ -18,7 +14,6 @@ import { syncInvoiceCadenceMetadataForSubscription } from "../lib/syncInvoiceCad
 const COUPON_90 = "awesome-90-off-3m";
 const COUPON_50 = "awesome-50-off-6m";
 const TEST_PM = "pm_card_visa";
-const DAY = 86_400;
 const SOURCE = "create_subscription";
 
 async function main(): Promise<void> {
@@ -74,27 +69,13 @@ async function main(): Promise<void> {
         items: [{ price: streamingPrice.id, quantity: 1 }],
         duration: { interval: "month", interval_count: 6 },
         discounts: [{ coupon: COUPON_50 }],
-        metadata: schedulePhaseMetadataForSubscription({
-          couponSnapshot: COUPON_50,
-        }),
+        metadata: { couponSnapshot: COUPON_50 },
       },
     ],
     expand: ["subscription"],
   });
 
-  if (months > 0) {
-    const beforeClock = await stripe.testHelpers.testClocks.retrieve(clock.id);
-    let currentFrozen = beforeClock.frozen_time;
-    let remainingMonths = months;
-    while (remainingMonths > 0) {
-      const stepMonths = Math.min(2, remainingMonths);
-      const stepTarget = currentFrozen + stepMonths * 30 * DAY;
-      await advanceTestClock(clock.id, stepTarget);
-      const ready = await waitTestClockReady(clock.id, { timeoutMs: 180_000 });
-      currentFrozen = ready.frozen_time;
-      remainingMonths -= stepMonths;
-    }
-  }
+  await advanceTestClockByMonths(clock.id, months);
 
   const subId =
     typeof schedule.subscription === "string"

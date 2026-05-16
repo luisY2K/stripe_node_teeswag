@@ -1,12 +1,17 @@
 import type Stripe from "stripe";
+import { addMonthsUnix } from "./addMonthsUnix.js";
 import { stripe } from "./stripe.js";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const DAY = 86_400;
 
 /**
- * Advance a test clock forward by N × ~30 days, in steps of at most 2 months
- * (Stripe test clocks work reliably with chunked advances for monthly subs).
+ * Advance a test clock forward by N calendar months, chunked to at most 2
+ * months per step. Each step uses `addMonthsUnix` (end-of-month clamped),
+ * matching Stripe's billing-anchor semantics, so the step always lands on or
+ * before Stripe's "two intervals from current frozen time" wall regardless of
+ * 28/30/31-day months. Naive 30-day arithmetic overshoots that wall whenever a
+ * 31-day month is in the window.
  */
 export async function advanceTestClockByMonths(
   testClockId: string,
@@ -23,7 +28,7 @@ export async function advanceTestClockByMonths(
   let lastReady: Stripe.Response<Stripe.TestHelpers.TestClock> | undefined;
   while (remainingMonths > 0) {
     const stepMonths = Math.min(2, remainingMonths);
-    const stepTarget = currentFrozen + stepMonths * 30 * DAY;
+    const stepTarget = addMonthsUnix(currentFrozen, stepMonths);
     await advanceTestClock(testClockId, stepTarget);
     lastReady = await waitTestClockReady(testClockId, { timeoutMs: waitTimeoutMs });
     currentFrozen = lastReady.frozen_time;

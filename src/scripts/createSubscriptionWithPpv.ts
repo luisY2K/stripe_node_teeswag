@@ -8,10 +8,9 @@ import { parseMonthArg } from "../lib/parseMonthArg.js";
 import { parseViewsArg } from "../lib/parseViewsArg.js";
 import { PPV_METER_EVENT_NAME, PPV_PRICE_LOOKUP_KEY } from "../lib/ppvConstants.js";
 import {
-  advanceTestClock,
   advanceTestClockByDays,
+  advanceTestClockByMonths,
   createTestClock,
-  waitTestClockReady,
 } from "../lib/testClock.js";
 import { stripe } from "../lib/stripe.js";
 import {
@@ -356,18 +355,8 @@ async function runLegacyScenario(argv: readonly string[]): Promise<void> {
 
   if (months > 0) {
     console.log(`\n--- Advancing clock by ${months} month(s) ---`);
-    const beforeClock = await stripe.testHelpers.testClocks.retrieve(clock.id);
-    let currentFrozen = beforeClock.frozen_time;
-    let remainingMonths = months;
-    while (remainingMonths > 0) {
-      const stepMonths = Math.min(2, remainingMonths);
-      const stepTarget = currentFrozen + stepMonths * 30 * DAY;
-      await advanceTestClock(clock.id, stepTarget);
-      const ready = await waitTestClockReady(clock.id, { timeoutMs: 180_000 });
-      currentFrozen = ready.frozen_time;
-      remainingMonths -= stepMonths;
-    }
-    console.log(`Clock advanced ${months} month(s) (~${months * 30}d).`);
+    await advanceTestClockByMonths(clock.id, months);
+    console.log(`Clock advanced ${months} month(s).`);
   }
 
   const items = subscription.items.data;
