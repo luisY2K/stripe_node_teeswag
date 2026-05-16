@@ -1,22 +1,22 @@
 import type Stripe from "stripe";
-import { createClockedCustomer } from "../lib/clockedCustomer.js";
-import { dashboardSubscriptionUrl } from "../lib/dashboardUrl.js";
-import { ensureAwesomeCatalog } from "../lib/ensureAwesomeCatalog.js";
-import { getPriceByLookupKey } from "../lib/getPriceByLookupKey.js";
-import { parseMonthArg } from "../lib/parseMonthArg.js";
+import { createClockedCustomer } from "../../lib/clockedCustomer.js";
+import { dashboardSubscriptionUrl } from "../../lib/dashboardUrl.js";
+import { ensureAwesomeCatalog } from "../../lib/ensureAwesomeCatalog.js";
+import { getPriceByLookupKey } from "../../lib/getPriceByLookupKey.js";
+import { parseMonthArg } from "../../lib/parseMonthArg.js";
 import {
   LOOKUP_DELIVERY_MONTHLY_EUR,
   LOOKUP_STREAMING_BASE_EUR,
-} from "../lib/subscriptionCaseCatalog.js";
-import { syncInvoiceCadenceMetadataForSubscription } from "../lib/syncInvoiceCadenceMetadata.js";
-import { stripe } from "../lib/stripe.js";
-import { advanceTestClockByMonths } from "../lib/testClock.js";
+} from "../../lib/subscriptionCaseCatalog.js";
+import { syncInvoiceCadenceMetadataForSubscription } from "../../lib/syncInvoiceCadenceMetadata.js";
+import { stripe } from "../../lib/stripe.js";
+import { advanceTestClockByMonths } from "../../lib/testClock.js";
 import {
   directSubscriptionMetadata,
   lineItemMetadata,
   schedulePhaseMetadataForSubscription,
   subscriptionScheduleObjectMetadata,
-} from "../lib/teeswagSubscriptionMetadata.js";
+} from "../../lib/teeswagSubscriptionMetadata.js";
 
 const COUPON_100 = "awesome-100-off-3m";
 const COUPON_90 = "awesome-90-off-3m";

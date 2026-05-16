@@ -1,0 +1,11 @@
+---
+description: Archived Stripe scripts for Cases 1/4/5/7 live under scripts/archive — not wired in package.json.
+alwaysApply: true
+---
+
+# Archived subscription case scripts
+
+Stripe demo scripts for **Cases 1, 4, 5, and 7** (aligned two-sub flows, bundle two lines, flexible mixed interval, align delivery cadence to stream) live under **`src/scripts/archive/`** only.
+
+- They are **intentionally not** declared in **`package.json`** `scripts`. Prefer **`npm run script -- src/scripts/archive/<filename>.ts`** if something must run them locally.
+- For product work, onboarding, demos, or “what should I run”: treat **`create:subscription:add-streaming-to-delivery`** plus the remaining **`scripts` entries as first-class**. Do **not** suggest resurrecting **`create:subscription:*`** npm shortcuts for archived files unless the user asks.

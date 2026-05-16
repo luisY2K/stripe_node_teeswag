@@ -4,7 +4,7 @@ Node v24 + TypeScript scripts for prototyping Stripe subscription flows with **t
 
 ## Demo scope (for presenters and assisting agents)
 
-For the **live demo**, use **only** these `npm run` scripts (see [`package.json`](package.json) lines 10–15):
+For the **live demo**, use **only** these `npm run` scripts (through `create:subscription:add-streaming-to-delivery` in [`package.json`](package.json) `scripts`; anything under [`src/scripts/archive/`](src/scripts/archive) is intentionally **not** wired there):
 
 - `npm run setup:awesome` — idempotent catalog bootstrap (prerequisite; not a numbered “case”).
 - `npm run create:subscription` — phased schedule (90%×3 → 50%×6 → release).
@@ -13,7 +13,7 @@ For the **live demo**, use **only** these `npm run` scripts (see [`package.json`
 - `npm run create:subscription:ppv` — phased base + metered PPV (default scenario).
 - `npm run create:subscription:add-streaming-to-delivery` — add streaming to an existing delivery subscription (delivery + streaming on one subscription).
 
-**Ignore for the demo presentation:** any other `create:subscription:*` commands (e.g. bundle, flexible, aligned two-sub flows), `npm run apply:retention` (superseded for the demo by `create:subscription:retention`), and dev tooling (`dev`, `script`, `typecheck`, `lint*`, `format*`, `test*`). Those remain in the repo for engineering reference only.
+**Ignore for the demo presentation:** Stripe edge-case scripts archived under **`src/scripts/archive/`** (Cases 1, 4, 5, 7—run only ad hoc via `npm run script -- …` if needed), `npm run apply:retention` (superseded for the demo by `create:subscription:retention`), and dev tooling (`dev`, `script`, `typecheck`, `lint*`, `format*`, `test*`).
 
 Use cases mapped to the partner brief and this repo: [docs/use-cases.md](docs/use-cases.md).
 
@@ -47,10 +47,6 @@ STRIPE_SECRET_KEY=sk_test_...
 | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `npm run setup:awesome`                                      | *(In demo scope.)* Idempotent: Awesome Stream + delivery prices, discount coupons, PPV product + meter + **EUR 3 per view** metered price (see [`ensureAwesomeCatalog`](src/lib/ensureAwesomeCatalog.ts), [`setupAwesome.ts`](src/scripts/setupAwesome.ts))                                                                                                                                                                                                                            |
 | `npm run create:subscription:add-streaming-to-delivery`      | *(In demo scope.)* **Add streaming to delivery:** monthly Awesome Delivery (~2 months default); add streaming and keep one canonical inline schedule flow. Default ladder: stub price (~10% list) → **90%×3 → 50%×6** → 1-month list tail. `free-trial`: €0 stub → **trial 1 month** → **90%×2 → 50%×6** → 1-month list tail. Positioning: `stub short` (~7d, default) / `stub long` (~18d). Tenure: separate argv tokens `m N` after `--` (not `mN`). |
-| `npm run create:subscription:align-delivery-cycle-to-stream` | **Case 7** *(out of demo scope)*: convert yearly delivery to monthly on add-stream (`create_prorations` credit), then run aligned phased ladder. Optional `-- free-trial`; override age with `-- m N`.                                                                                                                                                                                                                                 |
-| `npm run create:subscription:bundle-two-lines`               | **Case 4** *(out of demo scope)*: migrate delivery-only → one sub (delivery + stream) + schedule (90%→50% on streaming line). Monthly delivery ~2 months default; `-- m N`.                                                                                                                                                                                                                                                            |
-| `npm run create:subscription:flexible-mixed-interval`        | **Case 5** *(out of demo scope)*: cancel yearly delivery with credit → new flexible sub (yearly delivery + monthly stream, 90% on streaming item). ~2 months default; `-- m N`.                                                                                                                                                                                                                                                        |
-| `npm run create:subscription:aligned-delivery-streaming`     | **Case 1** *(out of demo scope)*: monthly delivery ~2 months, then Awesome Stream schedule; clock advances +2 months after both subs exist. Two subs, two invoice streams. `-- m N`.                                                                                                                                                                                                                                                   |
 | `npm run create:subscription`                                | *(In demo scope.)* Ensures catalog, then test clock + customer + schedule (90% → 50% → release). Optional `month N` / `m N` advances the clock by ~N×30d (chunked, 2 months/step). See [`createSubscription.ts`](src/scripts/createSubscription.ts).                                                                                                                                                                                   |
 | `npm run create:subscription:trial`                          | *(In demo scope.)* Same as `create:subscription` but starts with a 1-month trial (trial → 90% → 50% → release). See [`createSubscriptionWithTrial.ts`](src/scripts/createSubscriptionWithTrial.ts).                                                                                                                                                                                                                                                                                                                      |
 | `npm run create:subscription:retention`                      | *(In demo scope.)* Self-contained retention demo: ensures catalog, creates phased schedule (90%×3 → 50%×6), advances the test clock **4 months** (lands in the 50% phase), then swaps the **current** phase coupon to **70%** via [`applyAwesomeRetention`](src/lib/applyRetention.ts). Prints dashboard URL + customer ad-hoc promotion count. See [`createSubscriptionWithRetention.ts`](src/scripts/createSubscriptionWithRetention.ts). |
@@ -83,8 +79,10 @@ npm run create:subscription:ppv views 5 month 1   # legacy CLI mode
 
 npm run create:subscription:add-streaming-to-delivery -- m 12
 
+# Archived edge-case demos (Cases 1/4/5/7, not in package.json), e.g.:
+# npm run script -- src/scripts/archive/createBundleTwoLineSubscription.ts -- m 3
+
 # Out of live demo scope (engineering reference):
-# npm run create:subscription:bundle-two-lines -- m 3
 # npm run apply:retention -- sub_1ABC...
 ```
 
@@ -132,9 +130,11 @@ src/
     createSubscriptionWithRetention.ts
     createSubscriptionWithPpv.ts
     addStreamingToDeliverySubscription.ts
-    createBundleTwoLineSubscription.ts
-    createFlexibleMixedIntervalSubscription.ts
-    createAlignedDeliveryAndStreamingPair.ts
+    archive/
+      alignDeliveryCycleToStream.ts
+      createAlignedDeliveryAndStreamingPair.ts
+      createBundleTwoLineSubscription.ts
+      createFlexibleMixedIntervalSubscription.ts
     applyRetention.ts
     example.ts              # `npm run dev` entry
 tests/

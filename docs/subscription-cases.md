@@ -4,7 +4,7 @@ This document catalogs realistic Stripe Billing shapes when **premium delivery**
 
 ## Demo scope
 
-For the **live TeeSwag demo**, the only scripted multi-product flow in scope is **`npm run create:subscription:add-streaming-to-delivery`** ([`addStreamingToDeliverySubscription.ts`](../src/scripts/addStreamingToDeliverySubscription.ts); see root [`package.json`](../package.json)), which adds streaming to an existing delivery subscription. Cases 1, 4, 5, and 7 (and scripted flows for them) are **out of demo scope**: keep them as **architecture and partner-conversation** material; do **not** rehearse or present those `npm run` paths during the demo. Conceptual Cases 2, 3, and 8 have no dedicated demo script here — same rule: talking points only.
+For the **live TeeSwag demo**, the only scripted multi-product flow in scope is **`npm run create:subscription:add-streaming-to-delivery`** ([`addStreamingToDeliverySubscription.ts`](../src/scripts/addStreamingToDeliverySubscription.ts); see root [`package.json`](../package.json)), which adds streaming to an existing delivery subscription. Cases 1, 4, 5, and 7 previously had runnable helpers; those scripts now live under **[`src/scripts/archive/`](../src/scripts/archive/)** only (removed from **`package.json`**). Treat them as **architecture and partner-conversation** reference—do **not** rehearse during the demo. If engineers must run them, use **`npm run script -- src/scripts/archive/<file>.ts`** (for example `createBundleTwoLineSubscription.ts`). Conceptual Cases 2, 3, and 8 have no dedicated script here — same rule: talking points only.
 
 Official references:
 
@@ -63,7 +63,7 @@ Each case uses: **Setup → Stripe sketch → Customer-visible outcome → Pros 
 
 ### Case 1 — Two products, two subscriptions, same interval, aligned anchor, default proration
 
-**Run it:** `npm run create:subscription:aligned-delivery-streaming`
+**Run it (archived script, not in `package.json`):** `npm run script -- src/scripts/archive/createAlignedDeliveryAndStreamingPair.ts`
 
 **Demo script.** Creates **monthly Awesome Delivery**, advances the test clock (~**2 months** by default; override with `m N`), then creates **Awesome Stream** via a **`subscription_schedule`** with **`start_date: now`** (no past **`billing_cycle_anchor`** — avoids back-billing multiple periods on the streaming-only subscription’s first invoice). Phased coupons (90% → 50%) on streaming only—same coupon rhythm as `npm run create:subscription`. Then advances the clock **+2 months** so both subscriptions have aged together before you inspect invoices.
 
@@ -138,9 +138,9 @@ Same mechanics as **Case 1**, framed as cross-product: `prod_a` vs `prod_b`. Ali
 
 ### Case 4 — Combined product `prod_c` carrying **both** prices, **one** subscription, **two** items
 
-**Run it:** `npm run create:subscription:bundle-two-lines`
+**Run it (archived script, not in `package.json`):** `npm run script -- src/scripts/archive/createBundleTwoLineSubscription.ts`
 
-**Demo script.** Models **migration**: customer already has **monthly Awesome Delivery** (~**2 months** on the clock by default; `m N`). **`subscriptions.cancel`** with **`prorate`** + **`invoice_now`** issues a **credit** for unused delivery time. Then **`subscription_schedules.create`** builds **one** subscription with **two items**: delivery + streaming, with **90% → 50%** phases **only on the streaming item** (delivery stays full price). **`start_date`** is **`now`** (subscription schedule default)—**do not** reuse the canceled sub’s anchor here or the **first invoice can bill two monthly periods at once** (~€24 instead of €12). **Customer-visible cadence:** **€12 × 3**, **€20 × 6**, then **€30**… Optional **`free-trial`** (`npm run … -- free-trial`): lead phase uses **`awesome-100-off-3m`** on streaming for one month → **€10**, then **€12 × 2** (90% is two months so total promo window is nine months with the trial), **€20 × 6**, **€30**….
+**Demo script.** Models **migration**: customer already has **monthly Awesome Delivery** (~**2 months** on the clock by default; `m N`). **`subscriptions.cancel`** with **`prorate`** + **`invoice_now`** issues a **credit** for unused delivery time. Then **`subscription_schedules.create`** builds **one** subscription with **two items**: delivery + streaming, with **90% → 50%** phases **only on the streaming item** (delivery stays full price). **`start_date`** is **`now`** (subscription schedule default)—**do not** reuse the canceled sub’s anchor here or the **first invoice can bill two monthly periods at once** (~€24 instead of €12). **Customer-visible cadence:** **€12 × 3**, **€20 × 6**, then **€30**… Optional **`free-trial`** (`npm run script -- src/scripts/archive/createBundleTwoLineSubscription.ts -- free-trial`): lead phase uses **`awesome-100-off-3m`** on streaming for one month → **€10**, then **€12 × 2** (90% is two months so total promo window is nine months with the trial), **€20 × 6**, **€30**….
 
 **Setup (conceptual).** In partner docs, **`prod_c`** is sometimes a marketing “bundle” with **`price_a`** and **`price_b`** on the same product. This repo’s demo uses **two real products** (`Awesome Delivery` + **Awesome Stream** / `prod_awesome`) on **one** subscription—invoice lines still show both product names.
 
@@ -156,9 +156,9 @@ Same mechanics as **Case 1**, framed as cross-product: `prod_a` vs `prod_b`. Ali
 
 ### Case 5 — One subscription, **two products**, two items (mixed intervals possible): `prod_a` + `prod_b`
 
-**Run it:** `npm run create:subscription:flexible-mixed-interval`
+**Run it (archived script, not in `package.json`):** `npm run script -- src/scripts/archive/createFlexibleMixedIntervalSubscription.ts`
 
-**Demo script.** Starts from **yearly flexible Awesome Delivery** (~**2 months** elapsed by default; `m N`). Cancels with **`prorate`** + **`invoice_now`** (credit for unused months). Creates a new **`billing_mode: flexible`** subscription with **yearly** delivery + **monthly** Awesome Stream — **no preserved `billing_cycle_anchor`** (defaults to **now**, avoiding a **€24-style first invoice**). Migrates to a **`subscription_schedule`** with phased **90% → 50%** on the streaming item only (same helper as add-streaming-to-delivery). **Cadence on streaming renewals:** **€12 × 3**, **€20 × 6**, **€30**…. Optional **`free-trial`** (`npm run … -- free-trial`): **€10**, then **€12 × 2**, **€20 × 6**, **€30**…. **`npm run apply:retention`** does not swap these item-level phased coupons.
+**Demo script.** Starts from **yearly flexible Awesome Delivery** (~**2 months** elapsed by default; `m N`). Cancels with **`prorate`** + **`invoice_now`** (credit for unused months). Creates a new **`billing_mode: flexible`** subscription with **yearly** delivery + **monthly** Awesome Stream — **no preserved `billing_cycle_anchor`** (defaults to **now**, avoiding a **€24-style first invoice**). Migrates to a **`subscription_schedule`** with phased **90% → 50%** on the streaming item only (same helper as add-streaming-to-delivery). **Cadence on streaming renewals:** **€12 × 3**, **€20 × 6**, **€30**…. Optional **`free-trial`** (`npm run script -- src/scripts/archive/createFlexibleMixedIntervalSubscription.ts -- free-trial`): **€10**, then **€12 × 2**, **€20 × 6**, **€30**…. **`npm run apply:retention`** does not swap these item-level phased coupons.
 
 **Setup.** One subscription with item 1 → `price_a` on `prod_a`, item 2 → `price_b` on `prod_b`. If **`price_a`** is yearly and **`price_b`** monthly (and metered PPV monthly), you need [**mixed interval subscriptions**](https://docs.stripe.com/billing/subscriptions/mixed-interval):
 
@@ -228,7 +228,7 @@ Use **`billing_mode[type]=flexible`** when delivery and streaming intervals diff
 
 ### Case 7 — Align delivery cycle to stream cycle (monthly + monthly target)
 
-**Run it:** `npm run create:subscription:align-delivery-cycle-to-stream`
+**Run it (archived script, not in `package.json`):** `npm run script -- src/scripts/archive/alignDeliveryCycleToStream.ts`
 
 **Scope caveat.** This case is only for the target where both items end up **monthly** on one subscription. Use it when a customer is on yearly delivery and product accepts changing the delivery cadence.
 
