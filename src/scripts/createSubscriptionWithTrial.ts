@@ -1,3 +1,4 @@
+import { addMonthsUnix } from "../lib/addMonthsUnix.js";
 import { dashboardSubscriptionUrl } from "../lib/dashboardUrl.js";
 import { ensureAwesomeCatalog } from "../lib/ensureAwesomeCatalog.js";
 import { makeFakeCustomer } from "../lib/fakeCustomer.js";
@@ -49,9 +50,17 @@ async function main(): Promise<void> {
 
   const streamingPrice = await getPriceByLookupKey("awesome_monthly_eur");
 
+  // Phase 1 lasts 3 months: first month is free via trial_end, then 90% off
+  // for the remaining 2 months. trial_end must be <= phase end_date per the
+  // Stripe API, so both timestamps are computed client-side off nowSec (which
+  // also anchors the schedule start) to avoid any server-side "now" drift.
+  const trialEnd = addMonthsUnix(nowSec, 1);
+  const phase1End = addMonthsUnix(nowSec, 3);
+  const phase2End = addMonthsUnix(phase1End, 6);
+
   const schedule = await stripe.subscriptionSchedules.create({
     customer: customer.id,
-    start_date: "now",
+    start_date: nowSec,
     end_behavior: "release",
     metadata: subscriptionScheduleObjectMetadata(SOURCE),
     default_settings: {
@@ -60,8 +69,8 @@ async function main(): Promise<void> {
     phases: [
       {
         items: [{ price: streamingPrice.id, quantity: 1 }],
-        duration: { interval: "month", interval_count: 1 },
-        trial: true,
+        end_date: phase1End,
+        trial_end: trialEnd,
         discounts: [{ coupon: COUPON_90 }],
         metadata: schedulePhaseMetadataForSubscription({
           source: SOURCE,
@@ -73,12 +82,7 @@ async function main(): Promise<void> {
       },
       {
         items: [{ price: streamingPrice.id, quantity: 1 }],
-        duration: { interval: "month", interval_count: 2 },
-        discounts: [{ coupon: COUPON_90 }],
-      },
-      {
-        items: [{ price: streamingPrice.id, quantity: 1 }],
-        duration: { interval: "month", interval_count: 6 },
+        end_date: phase2End,
         discounts: [{ coupon: COUPON_50 }],
         metadata: schedulePhaseMetadataForSubscription({
           couponSnapshot: COUPON_50,
@@ -124,7 +128,7 @@ async function main(): Promise<void> {
   console.log(`Advanced:      ${months} month(s) (~${months * 30}d on clock)`);
   console.log(`Invoices tagged with cadence: ${cadenceInvoicesUpdated}`);
   console.log(
-    "Phases: 1mo trial -> 2mo 90% -> 6mo 50% -> release. Then apply:retention if needed.",
+    "Phases: P1 3mo (1mo trial via trial_end + 2mo 90%) -> P2 6mo 50% -> release. Then apply:retention if needed.",
   );
 }
 
