@@ -75,10 +75,6 @@ async function main(): Promise<void> {
         duration: { interval: "month", interval_count: 6 },
         discounts: [{ coupon: COUPON_50 }],
         metadata: schedulePhaseMetadataForSubscription({
-          source: SOURCE,
-          mix: "streaming_only",
-          phaseTemplate: "90_50",
-          streamCadence: "month",
           couponSnapshot: COUPON_50,
         }),
       },
