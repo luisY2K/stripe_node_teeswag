@@ -55,8 +55,6 @@ async function main(): Promise<void> {
   // Stripe API, so both timestamps are computed client-side off nowSec (which
   // also anchors the schedule start) to avoid any server-side "now" drift.
   const trialEnd = addMonthsUnix(nowSec, 1);
-  const phase1End = addMonthsUnix(nowSec, 3);
-  const phase2End = addMonthsUnix(phase1End, 6);
 
   const schedule = await stripe.subscriptionSchedules.create({
     customer: customer.id,
@@ -69,7 +67,7 @@ async function main(): Promise<void> {
     phases: [
       {
         items: [{ price: streamingPrice.id, quantity: 1 }],
-        end_date: phase1End,
+        duration: { interval: "month", interval_count: 3 },
         trial_end: trialEnd,
         discounts: [{ coupon: COUPON_90 }],
         metadata: schedulePhaseMetadataForSubscription({
@@ -82,7 +80,7 @@ async function main(): Promise<void> {
       },
       {
         items: [{ price: streamingPrice.id, quantity: 1 }],
-        end_date: phase2End,
+        duration: { interval: "month", interval_count: 6 },
         discounts: [{ coupon: COUPON_50 }],
         metadata: schedulePhaseMetadataForSubscription({
           couponSnapshot: COUPON_50,
