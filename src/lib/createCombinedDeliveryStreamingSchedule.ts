@@ -42,7 +42,6 @@ export async function createCombinedDeliveryStreamingSchedule(
         source: scheduleSource,
         mix: "combined",
         phaseTemplate: "combined_90_50",
-        hasTrialThisPhase: p.couponId === STREAMING_FULL_DISCOUNT_COUPON,
         deliveryCadence: "month",
         streamCadence: "month",
         freeTrialStreaming,

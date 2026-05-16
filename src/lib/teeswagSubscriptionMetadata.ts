@@ -7,7 +7,6 @@ export const TEESWAG_KEYS = {
   MIX: "teeswag_mix",
   COUPON_SNAPSHOT: "teeswag_coupon_snapshot",
   PHASE_TEMPLATE: "teeswag_phase_template",
-  HAS_TRIAL: "teeswag_has_trial",
   DELIVERY_CADENCE: "delivery_cadence",
   STREAM_CADENCE: "stream_cadence",
   /** Set when subscription used CLI `free-trial` / first-month 100% off streaming; repeated on phases so it survives phase changes. */
@@ -48,7 +47,6 @@ export function directSubscriptionMetadata(params: {
   source: string;
   mix: TeeswagMix;
   phaseTemplate: string;
-  hasTrial: boolean;
   deliveryCadence?: TeeswagCadence;
   streamCadence?: TeeswagCadence;
   couponSnapshot?: string;
@@ -60,7 +58,6 @@ export function directSubscriptionMetadata(params: {
     [TEESWAG_KEYS.SOURCE]: params.source,
     [TEESWAG_KEYS.MIX]: params.mix,
     [TEESWAG_KEYS.PHASE_TEMPLATE]: params.phaseTemplate,
-    [TEESWAG_KEYS.HAS_TRIAL]: params.hasTrial ? "true" : "false",
   };
   if (params.freeTrialStreaming === true) {
     out[TEESWAG_KEYS.FREE_TRIAL_STREAMING] = "true";
@@ -82,28 +79,48 @@ export function directSubscriptionMetadata(params: {
 }
 
 /**
- * Metadata on each subscription schedule phase — Stripe copies onto the Subscription when the phase is entered.
+ * Patch-style metadata for a subscription schedule phase. Only emits keys for
+ * fields that are explicitly provided, so a phase can carry just the deltas
+ * (e.g. `{ couponSnapshot }`) and rely on Stripe's additive phase-metadata
+ * semantics — keys set on earlier phases stay on the subscription unless this
+ * phase explicitly overwrites them.
  */
 export function schedulePhaseMetadataForSubscription(params: {
-  source: string;
-  mix: TeeswagMix;
-  phaseTemplate: string;
-  hasTrialThisPhase: boolean;
+  source?: string;
+  mix?: TeeswagMix;
+  phaseTemplate?: string;
   deliveryCadence?: TeeswagCadence;
   streamCadence?: TeeswagCadence;
   couponSnapshot?: string;
   freeTrialStreaming?: boolean;
 }): Stripe.MetadataParam {
-  return directSubscriptionMetadata({
-    source: params.source,
-    mix: params.mix,
-    phaseTemplate: params.phaseTemplate,
-    hasTrial: params.hasTrialThisPhase,
-    deliveryCadence: params.deliveryCadence,
-    streamCadence: params.streamCadence,
-    couponSnapshot: params.couponSnapshot,
-    freeTrialStreaming: params.freeTrialStreaming,
-  });
+  const out: Record<string, string> = {};
+  if (params.source !== undefined) {
+    out[TEESWAG_KEYS.SOURCE] = params.source;
+  }
+  if (params.mix !== undefined) {
+    out[TEESWAG_KEYS.MIX] = params.mix;
+  }
+  if (params.phaseTemplate !== undefined) {
+    out[TEESWAG_KEYS.PHASE_TEMPLATE] = params.phaseTemplate;
+  }
+  if (params.freeTrialStreaming === true) {
+    out[TEESWAG_KEYS.FREE_TRIAL_STREAMING] = "true";
+  }
+  if (params.deliveryCadence !== undefined) {
+    out[TEESWAG_KEYS.DELIVERY_CADENCE] = params.deliveryCadence;
+  }
+  if (params.streamCadence !== undefined) {
+    out[TEESWAG_KEYS.STREAM_CADENCE] = params.streamCadence;
+  }
+  if (
+    params.couponSnapshot !== undefined &&
+    params.couponSnapshot !== "" &&
+    params.couponSnapshot !== "none"
+  ) {
+    out[TEESWAG_KEYS.COUPON_SNAPSHOT] = params.couponSnapshot;
+  }
+  return out;
 }
 
 /** Metadata on a subscription item (delivery / streaming / PPV meter line). */

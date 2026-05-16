@@ -46,7 +46,6 @@ export async function createExistingDeliveryCustomer(params: {
       source: params.teeswagSource,
       mix: "delivery_only",
       phaseTemplate: "none",
-      hasTrial: false,
       deliveryCadence: params.interval,
     }),
     items: [

@@ -48,7 +48,6 @@ async function main(): Promise<void> {
       source: SOURCE,
       mix: "delivery_only",
       phaseTemplate: "none",
-      hasTrial: false,
       deliveryCadence: "month",
     }),
     items: [
@@ -96,7 +95,6 @@ async function main(): Promise<void> {
         source: SOURCE,
         mix: "combined",
         phaseTemplate: "combined_90_50",
-        hasTrialThisPhase: p.couponId === COUPON_100,
         deliveryCadence: "month",
         streamCadence: "month",
         freeTrialStreaming,
